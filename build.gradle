@@ -1,6 +1,5 @@
 plugins {
 	id 'java'
-	id 'war'
 	id 'org.springframework.boot' version '4.0.5'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -20,12 +19,22 @@ repositories {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat-runtime'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
+    // Web & Backend Core
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Audio Processing (External API SDKs - e.g., Google Cloud)
+    implementation 'com.google.cloud:google-cloud-speech:4.38.0'
+    implementation 'com.google.cloud:google-cloud-texttospeech:2.42.0'
+
+    // Database & Monitoring
+    runtimeOnly 'com.h2database:h2' // 초기 개발용
+    implementation 'org.springframework.boot:spring-boot-starter-actuator' // 상태 모니터링
+}
 tasks.named('test') {
 	useJUnitPlatform()
 }
