@@ -2,28 +2,87 @@ package com.example.demo.service;
 
 import com.example.demo.domain.Explanation;
 import com.example.demo.repository.ExplanationRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class SttService {
 
+    @Value("${openai.api.key}")
+    private String apiKey;
+
     private final ExplanationRepository explanationRepository;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @PostConstruct
+    public void init() {
+
+        System.out.println("★ API KEY LOADED: " + apiKey);
+    }
 
     public String processSpeech(MultipartFile audioFile) {
-        // 1. 외부 STT API 호출 (지금은 가짜 데이터를 반환하도록 설정)
-        // String transcript = externalSttApi.transcribe(audioFile);
-        String transcript = "이것은 가비지 컬렉션의 동작 원리에 대한 설명입니다."; // Mock 데이터
+        String url = "https://api.openai.com/v1/chat/completions";
 
-        // 2. 변환된 텍스트를 DB에 저장
-        Explanation explanation = Explanation.builder()
-                .content(transcript)
-                .build();
+        // 1. 헤더 설정
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
 
-        explanationRepository.save(explanation);
+        // 2. 음성 데이터를 Base64로 인코딩 (GPT-4o 오디오 입력 방식)
+        String base64Audio;
+        try {
+            base64Audio = Base64.getEncoder().encodeToString(audioFile.getBytes());
+        } catch (IOException e) {
+            throw new RuntimeException("오디오 파일 인코딩 실패");
+        }
 
-        return transcript;
+        // 3. 메시지 구성 (멀티모달 입력)
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-4o");
+
+        List<Map<String, Object>> messages = new ArrayList<>();
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+
+        List<Map<String, Object>> content = new ArrayList<>();
+
+        // 텍스트 프롬프트: "이 음성을 텍스트로 변환하고 분석해줘"
+        content.add(Map.of("type", "text", "text", "사용자의 설명을 듣고 텍스트로 변환해줘."));
+
+        // 오디오 데이터 추가
+        content.add(Map.of("type", "input_audio", "input_audio",
+                Map.of("data", base64Audio, "format", "wav"))); // 형식은 파일에 맞게 조정
+
+        userMessage.put("content", content);
+        messages.add(userMessage);
+        requestBody.put("messages", messages);
+
+        // 4. API 호출
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, new HttpEntity<>(requestBody, headers), Map.class);
+
+            // GPT-4o가 반환한 텍스트 추출
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+            String transcript = (String) ((Map<String, Object>) choices.get(0).get("message")).get("content");
+
+            // DB 저장
+            explanationRepository.save(Explanation.builder().content(transcript).build());
+
+            return transcript;
+        } catch (Exception e) {
+            throw new RuntimeException("GPT-4o 처리 중 오류: " + e.getMessage());
+        }
     }
 }
