@@ -2,20 +2,22 @@ package com.example.demo.service;
 
 import com.example.demo.domain.Explanation;
 import com.example.demo.repository.ExplanationRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SttService {
@@ -26,60 +28,48 @@ public class SttService {
     private final ExplanationRepository explanationRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @PostConstruct
-    public void init() {
-
-        System.out.println("★ API KEY LOADED: " + apiKey);
-    }
-
     public String processSpeech(MultipartFile audioFile) {
-        String url = "https://api.openai.com/v1/chat/completions";
+        // Whisper-1 전용 엔드포인트
+        String url = "https://api.openai.com/v1/audio/transcriptions";
+
+        //비용측정용 타이머
+        long startTime = System.currentTimeMillis();
 
         try {
-            // 1. 인코딩 확인
-            byte[] bytes = audioFile.getBytes();
-            String base64Audio = Base64.getEncoder().encodeToString(bytes);
-
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             headers.setBearerAuth(apiKey);
 
-            // 2. 요청 바디 구성 (GPT-4o 전용)
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", "gpt-4o-audio-preview");
+            // multipart/form-data 구성을 위한 MultiValueMap 사용
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("file", audioFile.getResource());
+            body.add("model", "whisper-1");
+            body.add("language", "ko"); // 한국어 정확도 향상을 위한 명시적 지정
 
-            List<Map<String, Object>> messages = new ArrayList<>();
-            Map<String, Object> userMessage = new HashMap<>();
-            userMessage.put("role", "user");
+            HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            List<Map<String, Object>> content = new ArrayList<>();
-            content.add(Map.of("type", "text", "text", "이 음성을 한국어로 받아쓰기하고 요약해줘."));
-            content.add(Map.of(
-                    "type", "input_audio",
-                    "input_audio", Map.of("data", base64Audio, "format", "mp3")
-            ));
-
-            userMessage.put("content", content);
-            messages.add(userMessage);
-            requestBody.put("messages", messages);
-
-            // 3. 호출 및 상세 에러 로깅
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            // API 호출
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
 
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
-            String transcript = (String) ((Map<String, Object>) choices.get(0).get("message")).get("content");
+            if (response.getBody() != null && response.getBody().containsKey("text")) {
+                String transcript = (String) response.getBody().get("text");
 
-            explanationRepository.save(Explanation.builder().content(transcript).build());
-            return transcript;
+                // 1단계: 변환된 텍스트 DB 저장
+                explanationRepository.save(Explanation.builder()
+                        .content(transcript)
+                        .build());
 
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            // ★ 핵심: OpenAI가 보낸 실제 에러 메시지를 콘솔에 출력합니다.
-            System.err.println("OpenAI API Error: " + e.getResponseBodyAsString());
-            return "API 호출 에러: " + e.getResponseBodyAsString();
+                long endTime = System.currentTimeMillis();
+                log.info("Whisper STT 처리 시간: {}ms", endTime - startTime);
+                log.info("파일 크기: {} bytes", audioFile.getSize());
+
+                return transcript;
+            }
+            return "변환 실패: 응답 텍스트 없음";
+
         } catch (Exception e) {
             e.printStackTrace();
-            return "서버 내부 에러: " + e.getMessage();
+            return "Whisper STT 에러: " + e.getMessage();
         }
     }
 }

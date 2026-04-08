@@ -3,9 +3,9 @@ POST http://localhost:8080/api/v1/learning/start
 Content-Type: application/json
 
 {
-  "topic": "가비지 컬렉션",
-  "category": "IT",
-  "goal": "동작 원리 완벽 이해"
+  "topic": "주제",
+  "category": "카테고리",
+  "goal": "목표"
 }
 
 ### 음성 파일 업로드 및 STT 저장 테스트
@@ -16,5 +16,5 @@ Content-Type: multipart/form-data; boundary=WebAppBoundary
 Content-Disposition: form-data; name="file"; filename="test_audio.mp3"
 Content-Type: audio/mpeg
 
-< ./test_audio.mp3
+< ./test_audio_2.mp3
 --WebAppBoundary--
