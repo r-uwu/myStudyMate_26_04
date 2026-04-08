@@ -1,51 +1,56 @@
 package com.example.demo.controller;
 
-import com.example.demo.DTO.StudyRequest;
+import com.example.demo.dto.ChatMessage;
 import com.example.demo.service.AnalyzeService;
-import com.example.demo.service.SttService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api/v1/learning")
 @RequiredArgsConstructor
-@Slf4j
 public class LearningController {
 
-    private final SttService sttService;
     private final AnalyzeService analyzeService;
 
-    @PostMapping("/start")
-    //@GetMapping("/start")
-    public ResponseEntity<String> startSession(@RequestBody StudyRequest request) {
+    // 세션별 대화 이력을 저장하기 위한 메모리 맵 (ConcurrentHashMap 사용으로 스레드 안전성 확보)
+    private final Map<String, List<ChatMessage>> chatSessions = new ConcurrentHashMap<>();
 
-        return ResponseEntity.ok(request.topic() + " 학습 세션을 시작합니다.");
+    @PostMapping("/chat")
+    public ResponseEntity<String> chat(@RequestParam String sessionId, @RequestBody String userInput) {
+        // 1. 해당 세션의 이전 대화 이력을 가져오거나 새로 생성
+        List<ChatMessage> history = chatSessions.computeIfAbsent(sessionId, k -> new ArrayList<>());
+
+        // 2. 현재 사용자의 입력을 대화 이력에 추가
+        history.add(new ChatMessage("user", userInput));
+
+        // 3. 누적된 대화 이력을 바탕으로 AI 분석 요청
+        String aiResponse = analyzeService.analyzeWithHistory(history);
+
+        // 4. AI의 답변을 대화 이력에 추가하여 다음 턴의 문맥 유지
+        history.add(new ChatMessage("assistant", aiResponse));
+
+        return ResponseEntity.ok(aiResponse);
     }
 
-    @PostMapping("/explain")
-    public ResponseEntity<String> uploadSpeech(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("파일이 비어있습니다.");
+    @PostMapping("/summary")
+    public ResponseEntity<String> getSummary(@RequestParam String sessionId) {
+        List<ChatMessage> history = chatSessions.get(sessionId);
+
+        if (history == null || history.isEmpty()) {
+            return ResponseEntity.ok("아직 나눈 대화가 없는걸? 🤔");
         }
 
-        //stt
-        String transcript = sttService.processSpeech(file);
-        log.info("STT Result: {}", transcript);
+        String summary = analyzeService.summarizeConversation(history);
 
-        //analysis
-        String feedback = analyzeService.analyzeExplanation(transcript);
-        log.info("Analysis Feedback: {}", feedback);
+        // 요약이 끝났으므로 세션에서 대화 기록 삭제 (메모리 관리)
+        chatSessions.remove(sessionId);
 
-        Map<String, String> response = new HashMap<>();
-        response.put("transcript", transcript);
-        response.put("feedback", feedback);
-
-        return ResponseEntity.ok("STT 변환 및 저장 완료: " + response);
+        return ResponseEntity.ok(summary);
     }
 }

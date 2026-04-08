@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스터디 메이트 봇</title>
+    <style>
+        body { font-family: 'Pretendard', -apple-system, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; justify-content: center; color: #333; }
+        .app-container { width: 100%; max-width: 650px; background: white; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 85vh; overflow: hidden; position: relative; }
+
+        /* 헤더 스타일 */
+        .header { background: #38bdf8; color: white; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; }
+        .end-btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9em; font-weight: bold; transition: 0.2s; }
+        .end-btn:hover { background: #0369a1; }
+
+        /* 채팅 영역 */
+        #chat-section { display: flex; flex-direction: column; height: 100%; }
+        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #fafafa; }
+        .message { max-width: 80%; padding: 14px 18px; border-radius: 20px; line-height: 1.5; font-size: 15px; word-wrap: break-word; }
+        .user-msg { background: #38bdf8; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .ai-msg { background: #ffffff; border: 1px solid #e5e7eb; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; white-space: pre-wrap; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+
+        /* 입력 영역 */
+        .input-area { display: flex; padding: 16px; background: white; border-top: 1px solid #eee; }
+        input[type="text"] { flex: 1; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 24px; outline: none; font-size: 15px; background: #f8fafc; transition: 0.2s; }
+        input[type="text"]:focus { border-color: #38bdf8; background: white; }
+        .send-btn { background: #38bdf8; color: white; border: none; padding: 0 24px; margin-left: 10px; border-radius: 24px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .send-btn:hover { background: #0284c7; }
+
+        /* 로딩 애니메이션 */
+        .loading { display: none; align-self: flex-start; margin-left: 10px; color: #94a3b8; font-size: 14px; font-weight: 500; }
+
+        /* 요약(분석) 영역 */
+        #summary-section { display: none; padding: 30px; overflow-y: auto; height: 100%; background: white; }
+        .summary-title { font-size: 1.5em; font-weight: bold; color: #0284c7; margin-bottom: 20px; text-align: center; }
+        .summary-content { line-height: 1.7; font-size: 15.5px; white-space: pre-wrap; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .restart-btn { display: block; width: 100%; background: #38bdf8; color: white; text-align: center; padding: 15px; margin-top: 20px; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1em; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <span>🧑‍💻 스터디 메이트와 복습하기</span>
+        <button class="end-btn" onclick="endConversation()">대화 종료 및 요약</button>
+    </div>
+
+    <div id="chat-section">
+        <div class="chat-box" id="chatBox">
+            <div class="message ai-msg">안녕! 오늘 배운 내용 나한테 한 번 설명해볼래? 내가 듣고 이해 안 되는 부분은 편하게 질문할게! 😆</div>
+        </div>
+        <div class="loading" id="loading">친구가 타자를 치고 있어... 💬</div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="개념을 설명해 봐..." onkeypress="handleEnter(event)">
+            <button class="send-btn" onclick="sendMessage()">전송</button>
+        </div>
+    </div>
+
+    <div id="summary-section">
+        <div class="summary-title">📊 오늘 스터디 요약 노트</div>
+        <div class="summary-content" id="summaryContent">요약 정보를 불러오는 중입니다...</div>
+        <button class="restart-btn" onclick="location.reload()">새로운 주제로 다시 시작하기</button>
+    </div>
+</div>
+
+<script>
+    const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+    const chatBox = document.getElementById('chatBox');
+    const inputField = document.getElementById('userInput');
+    const loading = document.getElementById('loading');
+
+    const chatSection = document.getElementById('chat-section');
+    const summarySection = document.getElementById('summary-section');
+    const summaryContent = document.getElementById('summaryContent');
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') sendMessage();
+    }
+
+    async function sendMessage() {
+        const text = inputField.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user-msg');
+        inputField.value = '';
+
+        loading.style.display = 'block';
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            const response = await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: text
+            });
+            const reply = await response.text();
+
+            loading.style.display = 'none';
+            appendMessage(reply, 'ai-msg');
+        } catch (error) {
+            loading.style.display = 'none';
+            appendMessage("앗, 서버랑 연결이 끊긴 것 같아! 다시 시도해줄래? 😢", 'ai-msg');
+        }
+    }
+
+    function appendMessage(text, className) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${className}`;
+        msgDiv.textContent = text;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // 대화 종료 및 요약 요청 함수
+    async function endConversation() {
+        if (!confirm("대화를 종료하고 오늘 스터디 내용을 요약할까?")) return;
+
+        // UI 전환: 채팅창 숨기고 요약창 띄우기
+        chatSection.style.display = 'none';
+        summarySection.style.display = 'block';
+        document.querySelector('.end-btn').style.display = 'none'; // 헤더 버튼 숨김
+
+        try {
+            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}`, {
+                method: 'POST'
+            });
+            const summary = await response.text();
+
+            // 마크다운 줄바꿈이나 단순 텍스트 줄바꿈 처리
+            summaryContent.innerHTML = summary.replace(/\n/g, '<br>');
+        } catch (error) {
+            summaryContent.innerHTML = "요약을 불러오는 데 실패했어. 미안해! 😭";
+        }
+    }
+</script>
+
+</body>
+</html>
