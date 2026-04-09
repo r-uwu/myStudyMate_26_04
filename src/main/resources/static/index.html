@@ -5,30 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>스터디 메이트 봇</title>
     <style>
+        * { box-sizing: border-box; }
+
         body { font-family: 'Pretendard', -apple-system, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; justify-content: center; color: #333; }
         .app-container { width: 100%; max-width: 650px; background: white; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 85vh; overflow: hidden; position: relative; }
-
         /* 헤더 스타일 */
-        .header { background: #38bdf8; color: white; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; }
+        .header { background: #38bdf8; color: white; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; z-index: 10; }
         .end-btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9em; font-weight: bold; transition: 0.2s; }
         .end-btn:hover { background: #0369a1; }
 
+        /* 캐릭터 애니메이션 (상태별) */
+        .character-box { text-align: center; font-size: 60px; margin: 15px 0; transition: all 0.3s ease; }
+        @keyframes breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } }
+        .state-idle { animation: breathe 3s infinite ease-in-out; }
+
+        @keyframes nod { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(8deg); } 75% { transform: rotate(-8deg); } }
+        .state-listening { animation: nod 1s infinite ease-in-out; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5)); }
+
+        @keyframes think { 0%, 100% { transform: rotate(-10deg) translateY(0); } 50% { transform: rotate(10deg) translateY(-8px); } }
+        .state-thinking { animation: think 1.5s infinite ease-in-out; opacity: 0.8; }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        .state-responding { animation: bounce 0.6s infinite ease-in-out; }
+
         /* 채팅 영역 */
-        #chat-section { display: flex; flex-direction: column; height: 100%; }
-        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #fafafa; }
+
+        #chat-section { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; }
+        .chat-box { flex: 1; padding: 15px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #fafafa; min-height: 0;}
         .message { max-width: 80%; padding: 14px 18px; border-radius: 20px; line-height: 1.5; font-size: 15px; word-wrap: break-word; }
         .user-msg { background: #38bdf8; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
         .ai-msg { background: #ffffff; border: 1px solid #e5e7eb; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; white-space: pre-wrap; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .loading { display: none; align-self: flex-start; margin-left: 10px; color: #94a3b8; font-size: 14px; font-weight: 500; }
+
+        /* 이모티콘 팝업 메뉴 */
+        .emoticon-menu { display: none; position: absolute; bottom: 80px; left: 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 10px; gap: 8px; flex-wrap: wrap; max-width: 300px; z-index: 100; }
+        .emoticon-menu.active { display: flex; }
+        .emoticon-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; transition: 0.2s; color: #475569; font-weight: bold; }
+        .emoticon-item:hover { background: #e0f2fe; border-color: #38bdf8; color: #0284c7; }
 
         /* 입력 영역 */
-        .input-area { display: flex; padding: 16px; background: white; border-top: 1px solid #eee; }
+        .input-area { display: flex; padding: 16px; background: white; border-top: 1px solid #eee; align-items: center; }
+        .emoticon-btn { background: none; border: none; font-size: 24px; cursor: pointer; margin-right: 10px; padding: 0; transition: transform 0.2s; }
+        .emoticon-btn:hover { transform: scale(1.1); }
         input[type="text"] { flex: 1; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 24px; outline: none; font-size: 15px; background: #f8fafc; transition: 0.2s; }
         input[type="text"]:focus { border-color: #38bdf8; background: white; }
-        .send-btn { background: #38bdf8; color: white; border: none; padding: 0 24px; margin-left: 10px; border-radius: 24px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .send-btn { background: #38bdf8; color: white; border: none; padding: 12px 20px; margin-left: 10px; border-radius: 24px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .send-btn:hover { background: #0284c7; }
-
-        /* 로딩 애니메이션 */
-        .loading { display: none; align-self: flex-start; margin-left: 10px; color: #94a3b8; font-size: 14px; font-weight: 500; }
 
         /* 요약(분석) 영역 */
         #summary-section { display: none; padding: 30px; overflow-y: auto; height: 100%; background: white; }
@@ -46,12 +68,23 @@
     </div>
 
     <div id="chat-section">
+        <div id="character" class="character-box state-idle">👨‍🎓</div>
+
         <div class="chat-box" id="chatBox">
-            <div class="message ai-msg">안녕! 오늘 배운 내용 나한테 한 번 설명해볼래? 내가 듣고 이해 안 되는 부분은 편하게 질문할게! 😆</div>
+            <div class="message ai-msg">안녕! 오늘 배운 내용 나한테 한 번 설명해볼래? 이해 안 되는 부분은 편하게 질문할게! 😆</div>
         </div>
         <div class="loading" id="loading">친구가 타자를 치고 있어... 💬</div>
 
+        <div class="emoticon-menu" id="emoticonMenu">
+            <div class="emoticon-item" onclick="insertEmoticon(':happy:')">😀 :happy:</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':sad:')">😢 :sad:</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':thinking:')">🤔 :thinking:</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':thumbsup:')">👍 :thumbsup:</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':clap:')">👏 :clap:</div>
+        </div>
+
         <div class="input-area">
+            <button class="emoticon-btn" onclick="toggleEmoticonMenu()">😀</button>
             <input type="text" id="userInput" placeholder="개념을 설명해 봐..." onkeypress="handleEnter(event)">
             <button class="send-btn" onclick="sendMessage()">전송</button>
         </div>
@@ -60,20 +93,84 @@
     <div id="summary-section">
         <div class="summary-title">📊 오늘 스터디 요약 노트</div>
         <div class="summary-content" id="summaryContent">요약 정보를 불러오는 중입니다...</div>
-        <button class="restart-btn" onclick="location.reload()">새로운 주제로 다시 시작하기</button>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="restart-btn" style="flex: 1;" onclick="location.reload()">새로운 주제로 시작</button>
+            <button onclick="goToDashboard()" style="flex: 1; background: #0f172a; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: 0.2s;">내 학습 모아보기 ➡️</button>
+        </div>
     </div>
 </div>
-
 <script>
     const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
     const chatBox = document.getElementById('chatBox');
     const inputField = document.getElementById('userInput');
     const loading = document.getElementById('loading');
+    const character = document.getElementById('character');
+    const emoticonMenu = document.getElementById('emoticonMenu');
 
     const chatSection = document.getElementById('chat-section');
     const summarySection = document.getElementById('summary-section');
     const summaryContent = document.getElementById('summaryContent');
 
+    let activityThrottle = null;
+    let checkInterval = null;
+
+    // --- 1. UI 상태 제어 ---
+    function updateUIState(state) {
+        character.className = `character-box state-${state}`;
+        switch(state) {
+            case 'listening':
+                loading.style.display = 'block';
+                loading.textContent = "친구가 이야기를 듣고 있어... ✍️";
+                break;
+            case 'analyzing':
+                loading.style.display = 'block';
+                loading.textContent = "친구가 내용을 정리하고 있어... 🧠";
+                break;
+            case 'responding':
+                loading.style.display = 'block';
+                loading.textContent = "친구가 대답하는 중! 💬";
+                break;
+            case 'idle':
+                loading.style.display = 'none';
+                break;
+        }
+    }
+
+    // --- 2. 활동 보고 (Heartbeat & Debounce Reset) ---
+    // 이 함수가 백엔드의 3초 타이머를 계속 초기화합니다.
+    function reportUserActivity() {
+        if (activityThrottle) return;
+
+        activityThrottle = setTimeout(() => {
+            const text = inputField.value.trim();
+            const isEmpty = text.length === 0;
+
+            fetch(`/api/v1/learning/active?sessionId=${sessionId}&isEmpty=${isEmpty}`, {
+                method: 'POST'
+            }).then(res => {
+                if (!res.ok) console.error("활동 보고 실패:", res.status);
+            });
+
+            activityThrottle = null;
+        }, 1000); // 1초 간격으로 보고
+
+        if (inputField.value.trim().length > 0) {
+            updateUIState('listening');
+        }
+    }
+
+    // [핵심] 입력창에 글이 남아있는 동안 1.5초마다 "나 아직 작성 중이야"라고 신호를 보냄
+    // 백엔드 타이머가 3초이므로 1.5초마다 보내면 절대 타이머가 만료되지 않습니다.
+    setInterval(() => {
+        if (inputField.value.trim().length > 0) {
+            reportUserActivity();
+        }
+    }, 1500);
+
+    inputField.addEventListener('input', reportUserActivity);
+
+    // --- 3. 채팅 전송 및 폴링 ---
     function handleEnter(e) {
         if (e.key === 'Enter') sendMessage();
     }
@@ -83,27 +180,52 @@
         if (!text) return;
 
         appendMessage(text, 'user-msg');
-        inputField.value = '';
+        inputField.value = ''; // 입력창을 비움 -> 이제 Heartbeat가 isEmpty=true를 보내기 시작함
 
-        loading.style.display = 'block';
-        chatBox.scrollTop = chatBox.scrollHeight;
+        updateUIState('listening');
 
         try {
-            const response = await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
+            await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
                 body: text
             });
-            const reply = await response.text();
 
-            loading.style.display = 'none';
-            appendMessage(reply, 'ai-msg');
+            startResponseCheck();
         } catch (error) {
-            loading.style.display = 'none';
-            appendMessage("앗, 서버랑 연결이 끊긴 것 같아! 다시 시도해줄래? 😢", 'ai-msg');
+            updateUIState('idle');
+            appendMessage("연결 오류 발생! 다시 시도해줘.", 'ai-msg');
         }
     }
 
+    function startResponseCheck() {
+        if (checkInterval) return;
+
+        loading.textContent = "친구의 대답을 기다리는 중... 💬";
+
+        checkInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/v1/learning/response?sessionId=${sessionId}`);
+
+                if (response.status === 200) {
+                    const reply = await response.text();
+                    clearInterval(checkInterval);
+                    checkInterval = null;
+
+                    updateUIState('responding');
+                    appendMessage(reply, 'ai-msg');
+                    setTimeout(() => updateUIState('idle'), 2000);
+                } else if (response.status === 204) {
+                    // 서버가 아직 대기 중이거나 분석 중
+                    updateUIState('analyzing');
+                }
+            } catch (e) {
+                console.error("폴링 에러:", e);
+            }
+        }, 1000);
+    }
+
+    // --- 기타 유틸리티 (메시지 추가, 이모티콘 등) ---
     function appendMessage(text, className) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${className}`;
@@ -112,26 +234,38 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // 대화 종료 및 요약 요청 함수
-    async function endConversation() {
-        if (!confirm("대화를 종료하고 오늘 스터디 내용을 요약할까?")) return;
+    function toggleEmoticonMenu() {
+        emoticonMenu.classList.toggle('active');
+    }
 
-        // UI 전환: 채팅창 숨기고 요약창 띄우기
+    function insertEmoticon(code) {
+        inputField.value += (inputField.value.endsWith(' ') ? '' : ' ') + code + ' ';
+        emoticonMenu.classList.remove('active');
+        inputField.focus();
+        reportUserActivity();
+    }
+
+    async function endConversation() {
+        const topic = prompt("오늘 복습한 핵심 키워드가 뭐야?", "자유 주제");
+        if(!topic) return;
+
         chatSection.style.display = 'none';
         summarySection.style.display = 'block';
-        document.querySelector('.end-btn').style.display = 'none'; // 헤더 버튼 숨김
+        document.querySelector('.end-btn').style.display = 'none';
 
         try {
-            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}`, {
+            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, {
                 method: 'POST'
             });
             const summary = await response.text();
-
-            // 마크다운 줄바꿈이나 단순 텍스트 줄바꿈 처리
-            summaryContent.innerHTML = summary.replace(/\n/g, '<br>');
+            summaryContent.innerHTML = `<strong>"${topic}"</strong> 요약 완료! 대시보드에서 확인해 봐. 😊`;
         } catch (error) {
-            summaryContent.innerHTML = "요약을 불러오는 데 실패했어. 미안해! 😭";
+            summaryContent.innerHTML = "요약 실패! 😭";
         }
+    }
+
+    function goToDashboard() {
+        window.location.href = `/dashboard.html?sessionId=${sessionId}`;
     }
 </script>
 

@@ -1,8 +1,11 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.ChatMessage;
+import com.example.demo.ChatMessage;
 import com.example.demo.service.AnalyzeService;
+import com.example.demo.repository.StudyRecordRepository;
+import com.example.demo.domain.StudyRecord;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,46 +14,54 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/learning")
 @RequiredArgsConstructor
 public class LearningController {
 
     private final AnalyzeService analyzeService;
-
-    // 세션별 대화 이력을 저장하기 위한 메모리 맵 (ConcurrentHashMap 사용으로 스레드 안전성 확보)
+    private final StudyRecordRepository studyRecordRepository;
     private final Map<String, List<ChatMessage>> chatSessions = new ConcurrentHashMap<>();
 
-    @PostMapping("/chat")
-    public ResponseEntity<String> chat(@RequestParam String sessionId, @RequestBody String userInput) {
-        // 1. 해당 세션의 이전 대화 이력을 가져오거나 새로 생성
-        List<ChatMessage> history = chatSessions.computeIfAbsent(sessionId, k -> new ArrayList<>());
-
-        // 2. 현재 사용자의 입력을 대화 이력에 추가
-        history.add(new ChatMessage("user", userInput));
-
-        // 3. 누적된 대화 이력을 바탕으로 AI 분석 요청
-        String aiResponse = analyzeService.analyzeWithHistory(history);
-
-        // 4. AI의 답변을 대화 이력에 추가하여 다음 턴의 문맥 유지
-        history.add(new ChatMessage("assistant", aiResponse));
-
-        return ResponseEntity.ok(aiResponse);
-    }
+//    @PostMapping("/chat")
+//    public ResponseEntity<String> chat(@RequestParam String sessionId, @RequestBody String userInput) {
+//        List<ChatMessage> history = chatSessions.computeIfAbsent(sessionId, k -> new ArrayList<>());
+//
+//        history.add(new ChatMessage("user", userInput));
+//        String aiResponse = analyzeService.analyzeWithHistory(history);
+//        history.add(new ChatMessage("assistant", aiResponse));
+//
+//        return ResponseEntity.ok(aiResponse);
+//    }
 
     @PostMapping("/summary")
-    public ResponseEntity<String> getSummary(@RequestParam String sessionId) {
+    public ResponseEntity<String> getSummary(@RequestParam String sessionId, @RequestParam String topic) {
         List<ChatMessage> history = chatSessions.get(sessionId);
 
         if (history == null || history.isEmpty()) {
-            return ResponseEntity.ok("아직 나눈 대화가 없는걸? 🤔");
+            return ResponseEntity.ok("대화 기록이 없습니다.");
         }
 
         String summary = analyzeService.summarizeConversation(history);
 
-        // 요약이 끝났으므로 세션에서 대화 기록 삭제 (메모리 관리)
+        studyRecordRepository.save(StudyRecord.builder()
+                .sessionId(sessionId)
+                .topic(topic)
+                .summary(summary)
+                .build());
+
         chatSessions.remove(sessionId);
 
         return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<StudyRecord>> getHistory(@RequestParam String sessionId) {
+        // DB에서 해당 세션 아이디의 학습 기록을 최신순으로 모두 가져옵니다.
+        List<StudyRecord> history = studyRecordRepository.findBySessionIdOrderByCreatedAtDesc(sessionId);
+
+        // 프론트엔드로 데이터를 전달합니다. (JSON 형태로 자동 변환됨)
+        return ResponseEntity.ok(history);
     }
 }

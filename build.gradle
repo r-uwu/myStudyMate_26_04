@@ -34,7 +34,12 @@ dependencies {
     // Database & Monitoring
     runtimeOnly 'com.h2database:h2' // 초기 개발용
     implementation 'org.springframework.boot:spring-boot-starter-actuator' // 상태 모니터링
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis' //redis
+
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 }
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
