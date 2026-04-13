@@ -70,6 +70,9 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+
 <script>
     // ==========================================
     // 1. 전역 상태 및 DOM 요소 초기화
@@ -83,17 +86,19 @@
     const emoticonMenu = document.getElementById('emoticonMenu');
     const micBtn = document.getElementById('micBtn');
 
-    // N:1 제어 및 타이머 변수
+    // N:1 제어 및 오디오 변수
     let activityThrottle = null;
-    let checkInterval = null;
-    let isRecording = false;
-    let isVoiceProcessing = false;
     let currentAudio = null;
     let mediaRecorder = null;
     let audioChunks = [];
     let isRecording = false;
     let isVoiceProcessing = false;
     let isAutoMode = true;
+
+    // 스트리밍 오디오 제어 변수
+    const audioQueue = [];
+    let isPlaying = false;
+    let eventSource = null;
 
     // ==========================================
     // 2. UI 상태 및 오디오 제어
@@ -135,7 +140,7 @@
     function reportUserActivity(forceIsEmpty = null) {
         if (activityThrottle) return;
 
-        stopAiAudio(); // 사용자가 움직이면 AI 말 끊기 (인터럽트)
+        stopAiAudio();
 
         activityThrottle = setTimeout(() => {
             const text = inputField.value.trim();
@@ -152,11 +157,10 @@
         }
     }
 
-    // 1.5초마다 강제 체크하여 N:1 방어 (텍스트가 있거나, 녹음중이거나, 변환중이면 AI 응답 차단)
     setInterval(() => {
         const text = inputField.value.trim();
         if (text.length > 0 || isRecording || isVoiceProcessing) {
-            reportUserActivity(false); // isEmpty = false 강제 전송
+            reportUserActivity(false);
         }
     }, 1500);
 
@@ -166,31 +170,29 @@
     // 4. 음성 인식 (STT) 제어
     // ==========================================
     async function toggleRecording() {
-        stopAiAudio(); // 녹음 버튼 누르면 즉시 AI 조용히 시키기
+        stopAiAudio();
 
+        // 💡 이미 녹음 중일 때 직접 버튼을 눌러서 끄는 경우
         if (isRecording) {
-            isAutoMode = false;
+            isAutoMode = false; // 자동 연쇄 모드 차단
             stopRecording();
             return;
-            isAutoMode = true;
         }
 
-        try {
-            // 1. 마이크 권한 요청 및 스트림 획득
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // 💡 새롭게 마이크를 켤 때는 자동 모드 부활
+        isAutoMode = true;
 
-            // 2. 마이크 스트림을 얻자마자 무음 감지기 작동
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             startSilenceDetection(stream);
 
-            // 3. 녹음기 초기화
             mediaRecorder = new MediaRecorder(stream);
             audioChunks = [];
 
             mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
 
-            // 4. 녹음이 '정지'되었을 때 서버로 전송하는 핵심 로직
             mediaRecorder.onstop = async () => {
-                isVoiceProcessing = true; // STT 통신 시작 (응답 차단 락 유지)
+                isVoiceProcessing = true;
                 micBtn.textContent = '🎤';
                 micBtn.classList.remove('recording');
 
@@ -207,8 +209,7 @@
                     if (response.ok) {
                         const transcript = await response.text();
                         appendMessage("🎤 " + transcript, 'user-msg');
-                        isVoiceProcessing = false; // 변환 완료, 응답 락 해제
-                        startResponseCheck(); // AI 응답 기다리기
+                        isVoiceProcessing = false;
                     } else {
                         throw new Error("STT 실패");
                     }
@@ -218,10 +219,9 @@
                     isVoiceProcessing = false;
                 }
 
-                stream.getTracks().forEach(t => t.stop()); // 마이크 하드웨어 끄기
+                stream.getTracks().forEach(t => t.stop());
             };
 
-            // 5. 녹음 시작
             mediaRecorder.start();
             isRecording = true;
             micBtn.textContent = '⏹️';
@@ -241,8 +241,8 @@
     let analyser;
     let microphone;
     let silenceStart = null;
-    const SILENCE_THRESHOLD = 0.01; // 감도 조절 (필요시 0.03 등으로 변경)
-    const SILENCE_DURATION = 1500; // 1.5초 무음 시 종료
+    const SILENCE_THRESHOLD = 0.05;
+    const SILENCE_DURATION = 1500;
 
     async function startSilenceDetection(stream) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -265,7 +265,6 @@
                 if (!silenceStart) silenceStart = Date.now();
                 else if (Date.now() - silenceStart > SILENCE_DURATION) {
                     if (isRecording) {
-                        // 무음 감지 시 자동으로 stopRecording 호출
                         stopRecording();
                         silenceStart = null;
                         return;
@@ -280,14 +279,12 @@
     }
 
     function stopRecording() {
-        // mediaRecorder.stop()이 호출되면 자동으로 위의 mediaRecorder.onstop 로직이 실행됨
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
         }
         isRecording = false;
         updateUIState('analyzing');
 
-        // 메모리 누수 방지: 무음 감지기 깔끔하게 끄기
         if (typeof audioContext !== 'undefined' && audioContext.state !== 'closed') {
             audioContext.close();
         }
@@ -315,7 +312,6 @@
                 headers: { 'Content-Type': 'text/plain' },
                 body: text
             });
-            startResponseCheck();
         } catch (error) {
             updateUIState('idle');
             appendMessage("연결 오류 발생!", 'ai-msg');
@@ -323,56 +319,79 @@
     }
 
     // ==========================================
-    // 7. 폴링 및 응답 수신 (TTS 재생)
+    // 7. 실시간 스트리밍 수신 (SSE & Audio Queue)
     // ==========================================
-    function startResponseCheck() {
-        if (checkInterval) return;
-        loading.textContent = "친구의 대답을 기다리는 중... 💬";
+    function initSseConnection() {
+        if (eventSource) eventSource.close();
 
-        checkInterval = setInterval(async () => {
+        eventSource = new EventSource(`/api/v1/learning/subscribe?sessionId=${sessionId}`);
+
+        eventSource.addEventListener('message', (event) => {
             try {
-                const response = await fetch(`/api/v1/learning/response?sessionId=${sessionId}`);
-
-                if (response.status === 200) {
-                    const rawText = await response.text();
-                    clearInterval(checkInterval);
-                    checkInterval = null;
-
-                    try {
-                        const data = JSON.parse(rawText);
-                        appendMessage(data.text, 'ai-msg');
-                        updateUIState('speaking');
-
-                        if (data.audio) {
-                            currentAudio = new Audio("data:audio/mp3;base64," + data.audio);
-                            currentAudio.play().catch(e => console.error("오디오 재생 실패:", e));
-
-                            // 💡 TTS 재생이 끝나면 자동으로 녹음 다시 켜기!
-                            currentAudio.onended = () => {
-                                updateUIState('idle');
-                                currentAudio = null;
-
-                                setTimeout(() => {
-
-                                    if (!isRecording && isAutoMode) {
-                                        toggleRecording();
-                                    }
-                                }, 1000);
-                            };
-                        } else {
-                            setTimeout(() => updateUIState('idle'), 2000);
-                        }
-                    } catch (parseError) {
-                        appendMessage(rawText, 'ai-msg');
-                        updateUIState('idle');
-                    }
-                } else if (response.status === 204) {
-                    updateUIState('analyzing');
-                }
+                const data = JSON.parse(event.data);
+                handleIncomingChunk(data);
             } catch (e) {
-                console.error("폴링 에러:", e);
+                console.error("데이터 파싱 에러:", e);
             }
-        }, 1000);
+        });
+
+        eventSource.addEventListener('done', () => {
+            console.log("AI 응답 전체 수신 완료");
+        });
+
+        eventSource.onerror = (err) => {
+            console.error("SSE 연결 오류, 재연결 시도...", err);
+        };
+    }
+
+    initSseConnection();
+
+    let currentAiMsgDiv = null;
+
+    function handleIncomingChunk(data) {
+        renderStreamingText(data.text);
+
+        if (data.audio) {
+            audioQueue.push("data:audio/mp3;base64," + data.audio);
+            playNextInQueue();
+        }
+    }
+
+    function renderStreamingText(text) {
+        if (!currentAiMsgDiv || (isPlaying === false && audioQueue.length === 0)) {
+            currentAiMsgDiv = document.createElement('div');
+            currentAiMsgDiv.className = 'message ai-msg';
+            chatBox.appendChild(currentAiMsgDiv);
+        }
+        currentAiMsgDiv.textContent += text;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        updateUIState('speaking');
+    }
+
+    function playNextInQueue() {
+        if (isPlaying || audioQueue.length === 0) return;
+
+        isPlaying = true;
+        const nextAudioUrl = audioQueue.shift();
+        currentAudio = new Audio(nextAudioUrl);
+
+        currentAudio.play().catch(e => console.error("재생 실패:", e));
+
+        currentAudio.onended = () => {
+            isPlaying = false;
+            if (audioQueue.length > 0) {
+                playNextInQueue();
+            } else {
+                updateUIState('idle');
+                currentAudio = null;
+                currentAiMsgDiv = null;
+
+                // 💡 핸즈프리: 자동 모드일 때만 마이크 다시 켜기
+                setTimeout(() => {
+                    if (!isRecording && isAutoMode) toggleRecording();
+                }, 1000);
+            }
+        };
     }
 
     // ==========================================
