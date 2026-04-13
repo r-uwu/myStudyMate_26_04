@@ -1,7 +1,7 @@
-package com.example.demo.service;
+package com.workspace.service;
 
-import com.example.demo.domain.Explanation;
-import com.example.demo.repository.ExplanationRepository;
+import com.workspace.entity.Explanation;
+import com.workspace.repository.ExplanationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +15,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -29,10 +30,7 @@ public class SttService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public String processSpeech(MultipartFile audioFile) {
-        // Whisper-1 전용 엔드포인트
         String url = "https://api.openai.com/v1/audio/transcriptions";
-
-        //비용측정용 타이머
         long startTime = System.currentTimeMillis();
 
         try {
@@ -40,36 +38,55 @@ public class SttService {
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             headers.setBearerAuth(apiKey);
 
-            // multipart/form-data 구성을 위한 MultiValueMap 사용
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", audioFile.getResource());
             body.add("model", "whisper-1");
-            body.add("language", "ko"); // 한국어 정확도 향상을 위한 명시적 지정
+            body.add("response_format", "verbose_json");
+            body.add("temperature", 0.0);
+            body.add("prompt", "이것은 학생이 설명하는 스터디 대화입니다.");
+            body.add("language", "ko");
 
             HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            // API 호출
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
 
             if (response.getBody() != null && response.getBody().containsKey("text")) {
-                String transcript = (String) response.getBody().get("text");
+                Map<String, Object> responseBody = response.getBody();
+                String transcript = (String) responseBody.get("text");
 
-                // 1단계: 변환된 텍스트 DB 저장
-                explanationRepository.save(Explanation.builder()
-                        .content(transcript)
-                        .build());
+                // --- 💡 무음 확률(no_speech_prob) 체크 로직 시작 ---
+                if (responseBody.containsKey("segments")) {
+                    List<Map<String, Object>> segments = (List<Map<String, Object>>) responseBody.get("segments");
+                    if (!segments.isEmpty()) {
+                        // 첫 번째 세그먼트의 무음 확률 추출
+                        Object noSpeechProbObj = segments.get(0).get("no_speech_prob");
+                        if (noSpeechProbObj != null) {
+                            double noSpeechProb = Double.parseDouble(noSpeechProbObj.toString());
+
+                            // 무음 확률이 0.6(60%)을 넘으면 환각으로 간주하고 중단
+                            if (noSpeechProb > 0.6) {
+                                log.warn("⚠️ Whisper 환각 감지 (확률: {}), 텍스트: {}", noSpeechProb, transcript);
+                                return null;
+                            }
+                        }
+                    }
+                }
+                // --- 💡 무음 확률 체크 로직 끝 ---
+
+                // 환각이 아님이 검증된 경우에만 DB 저장 진행
+//                explanationRepository.save(Explanation.builder()
+//                        .content(transcript)
+//                        .build());
 
                 long endTime = System.currentTimeMillis();
                 log.info("Whisper STT 처리 시간: {}ms", endTime - startTime);
-                log.info("파일 크기: {} bytes", audioFile.getSize());
-
                 return transcript;
             }
-            return "변환 실패: 응답 텍스트 없음";
+            return null;
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return "Whisper STT 에러: " + e.getMessage();
+            log.error("Whisper STT 에러: {}", e.getMessage());
+            return null;
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.example.demo;
+package com.workspace;
 
 public class ChatMessage {
     private String role;
