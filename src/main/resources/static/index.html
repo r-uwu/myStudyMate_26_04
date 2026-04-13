@@ -3,119 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스터디 메이트 봇</title>
+    <title>스터디 메이트</title>
     <style>
-        * { box-sizing: border-box; }
-
-        body { font-family: 'Pretendard', -apple-system, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; display: flex; justify-content: center; color: #333; }
-        .app-container { width: 100%; max-width: 650px; background: white; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 85vh; overflow: hidden; position: relative; }
-        /* 헤더 스타일 */
-        .header { background: #38bdf8; color: white; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; z-index: 10; }
-        .end-btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9em; font-weight: bold; transition: 0.2s; }
-        .end-btn:hover { background: #0369a1; }
-
-        /* 캐릭터 애니메이션 (상태별) */
-        .character-box { text-align: center; font-size: 60px; margin: 15px 0; transition: all 0.3s ease; }
-        @keyframes breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } }
-        .state-idle { animation: breathe 3s infinite ease-in-out; }
-
-        @keyframes nod { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(8deg); } 75% { transform: rotate(-8deg); } }
-        .state-listening { animation: nod 1s infinite ease-in-out; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5)); }
-
-        @keyframes think { 0%, 100% { transform: rotate(-10deg) translateY(0); } 50% { transform: rotate(10deg) translateY(-8px); } }
-        .state-thinking { animation: think 1.5s infinite ease-in-out; opacity: 0.8; }
-
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
-        .state-responding { animation: bounce 0.6s infinite ease-in-out; }
-
-        /* 채팅 영역 */
-
-        #chat-section { display: flex; flex-direction: column; flex: 1; min-height: 0; position: relative; }
-        .chat-box { flex: 1; padding: 15px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #fafafa; min-height: 0;}
-        .message { max-width: 80%; padding: 14px 18px; border-radius: 20px; line-height: 1.5; font-size: 15px; word-wrap: break-word; }
-        .user-msg { background: #38bdf8; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .ai-msg { background: #ffffff; border: 1px solid #e5e7eb; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; white-space: pre-wrap; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .loading { display: none; align-self: flex-start; margin-left: 10px; color: #94a3b8; font-size: 14px; font-weight: 500; }
-
-        /* 이모티콘 팝업 메뉴 */
-        .emoticon-menu { display: none; position: absolute; bottom: 80px; left: 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 10px; gap: 8px; flex-wrap: wrap; max-width: 300px; z-index: 100; }
+        /* 기존에 서희님이 가지고 계시던 CSS 스타일이 있다면 이곳에 합쳐주세요 */
+        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }
+        .app-container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; padding: 20px;}
+        .chat-box { height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 8px;}
+        .message { margin-bottom: 10px; padding: 10px; border-radius: 8px; max-width: 80%; }
+        .user-msg { background: #e0f2fe; margin-left: auto; text-align: right; }
+        .ai-msg { background: #f1f5f9; margin-right: auto; }
+        .input-area { display: flex; gap: 10px; align-items: center; position: relative; }
+        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+        button { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; background: #3b82f6; color: white;}
+        .emoticon-menu { display: none; position: absolute; bottom: 50px; background: white; border: 1px solid #ccc; padding: 10px; border-radius: 8px; display: none; gap: 5px;}
         .emoticon-menu.active { display: flex; }
-        .emoticon-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; transition: 0.2s; color: #475569; font-weight: bold; }
-        .emoticon-item:hover { background: #e0f2fe; border-color: #38bdf8; color: #0284c7; }
+        .character-box { font-size: 2em; text-align: center; margin-bottom: 10px; transition: 0.3s; }
+        .loading { display: none; text-align: center; color: #64748b; font-size: 0.9em; margin-bottom: 10px;}
 
-        /* 입력 영역 */
-        .input-area { display: flex; padding: 16px; background: white; border-top: 1px solid #eee; align-items: center; }
-        .emoticon-btn { background: none; border: none; font-size: 24px; cursor: pointer; margin-right: 10px; padding: 0; transition: transform 0.2s; }
-        .emoticon-btn:hover { transform: scale(1.1); }
-        input[type="text"] { flex: 1; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 24px; outline: none; font-size: 15px; background: #f8fafc; transition: 0.2s; }
-        input[type="text"]:focus { border-color: #38bdf8; background: white; }
-        .send-btn { background: #38bdf8; color: white; border: none; padding: 12px 20px; margin-left: 10px; border-radius: 24px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .send-btn:hover { background: #0284c7; }
-
-        /* 요약(분석) 영역 */
-        #summary-section { display: none; padding: 30px; overflow-y: auto; height: 100%; background: white; }
-        .summary-title { font-size: 1.5em; font-weight: bold; color: #0284c7; margin-bottom: 20px; text-align: center; }
-        .summary-content { line-height: 1.7; font-size: 15.5px; white-space: pre-wrap; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
-        .restart-btn { display: block; width: 100%; background: #38bdf8; color: white; text-align: center; padding: 15px; margin-top: 20px; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1em; cursor: pointer; }
+        /* 마이크 버튼 전용 스타일 */
+        .mic-btn { background: #e2e8f0; color: black; font-size: 1.2rem; display: flex; justify-content: center; align-items: center;}
+        .mic-btn.recording { background: #fee2e2; color: #ef4444; animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <div class="header">
-        <span>🧑‍💻 스터디 메이트와 복습하기</span>
-        <button class="end-btn" onclick="endConversation()">대화 종료 및 요약</button>
+    <div class="header" style="display:flex; justify-content:space-between; margin-bottom:20px;">
+        <span style="font-weight:bold; font-size:1.2em;">🧑‍💻 스터디 메이트와 복습하기</span>
+        <button class="end-btn" onclick="endConversation()" style="background:#ef4444;">대화 종료</button>
     </div>
 
     <div id="chat-section">
         <div id="character" class="character-box state-idle">👨‍🎓</div>
+        <div class="loading" id="loading">대기 중...</div>
 
         <div class="chat-box" id="chatBox">
             <div class="message ai-msg">안녕! 오늘 배운 내용 나한테 한 번 설명해볼래? 이해 안 되는 부분은 편하게 질문할게! 😆</div>
         </div>
-        <div class="loading" id="loading">친구가 타자를 치고 있어... 💬</div>
 
         <div class="emoticon-menu" id="emoticonMenu">
-            <div class="emoticon-item" onclick="insertEmoticon(':happy:')">😀 :happy:</div>
-            <div class="emoticon-item" onclick="insertEmoticon(':sad:')">😢 :sad:</div>
-            <div class="emoticon-item" onclick="insertEmoticon(':thinking:')">🤔 :thinking:</div>
-            <div class="emoticon-item" onclick="insertEmoticon(':thumbsup:')">👍 :thumbsup:</div>
-            <div class="emoticon-item" onclick="insertEmoticon(':clap:')">👏 :clap:</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':happy:')">😀</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':sad:')">😢</div>
+            <div class="emoticon-item" onclick="insertEmoticon(':thinking:')">🤔</div>
         </div>
 
         <div class="input-area">
-            <button class="emoticon-btn" onclick="toggleEmoticonMenu()">😀</button>
+            <button class="emoticon-btn" onclick="toggleEmoticonMenu()" style="background:#e2e8f0; color:black;">😀</button>
             <input type="text" id="userInput" placeholder="개념을 설명해 봐..." onkeypress="handleEnter(event)">
+            <button id="micBtn" class="mic-btn" onclick="toggleRecording()">🎤</button>
             <button class="send-btn" onclick="sendMessage()">전송</button>
         </div>
     </div>
 
-    <div id="summary-section">
-        <div class="summary-title">📊 오늘 스터디 요약 노트</div>
+    <div id="summary-section" style="display: none; margin-top:20px;">
+        <div class="summary-title" style="font-weight:bold; font-size:1.2em; margin-bottom:10px;">📊 오늘 스터디 요약 노트</div>
         <div class="summary-content" id="summaryContent">요약 정보를 불러오는 중입니다...</div>
-
         <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button class="restart-btn" style="flex: 1;" onclick="location.reload()">새로운 주제로 시작</button>
-            <button onclick="goToDashboard()" style="flex: 1; background: #0f172a; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: 0.2s;">내 학습 모아보기 ➡️</button>
+            <button onclick="location.reload()" style="flex: 1; background:#64748b;">새 주제 시작</button>
+            <button onclick="goToDashboard()" style="flex: 1; background: #0f172a;">대시보드로 ➡️</button>
         </div>
     </div>
 </div>
+
 <script>
+    // ==========================================
+    // 1. 전역 상태 및 DOM 요소 초기화
+    // ==========================================
     const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+
     const chatBox = document.getElementById('chatBox');
     const inputField = document.getElementById('userInput');
     const loading = document.getElementById('loading');
     const character = document.getElementById('character');
     const emoticonMenu = document.getElementById('emoticonMenu');
+    const micBtn = document.getElementById('micBtn');
 
-    const chatSection = document.getElementById('chat-section');
-    const summarySection = document.getElementById('summary-section');
-    const summaryContent = document.getElementById('summaryContent');
-
+    // N:1 제어 및 타이머 변수
     let activityThrottle = null;
     let checkInterval = null;
+    let isRecording = false;
+    let isVoiceProcessing = false;
+    let currentAudio = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+    let isVoiceProcessing = false;
+    let isAutoMode = true;
 
-    // --- 1. UI 상태 제어 ---
+    // ==========================================
+    // 2. UI 상태 및 오디오 제어
+    // ==========================================
     function updateUIState(state) {
         character.className = `character-box state-${state}`;
         switch(state) {
@@ -127,50 +109,194 @@
                 loading.style.display = 'block';
                 loading.textContent = "친구가 내용을 정리하고 있어... 🧠";
                 break;
-            case 'responding':
+            case 'speaking':
                 loading.style.display = 'block';
-                loading.textContent = "친구가 대답하는 중! 💬";
+                loading.textContent = "친구가 대답하고 있어! 🔊";
                 break;
             case 'idle':
+            default:
                 loading.style.display = 'none';
                 break;
         }
     }
 
-    // --- 2. 활동 보고 (Heartbeat & Debounce Reset) ---
-    // 이 함수가 백엔드의 3초 타이머를 계속 초기화합니다.
-    function reportUserActivity() {
+    function stopAiAudio() {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+            if(character.className.includes('speaking')) updateUIState('idle');
+        }
+    }
+
+    // ==========================================
+    // 3. Heartbeat (활동 보고 로직)
+    // ==========================================
+    function reportUserActivity(forceIsEmpty = null) {
         if (activityThrottle) return;
+
+        stopAiAudio(); // 사용자가 움직이면 AI 말 끊기 (인터럽트)
 
         activityThrottle = setTimeout(() => {
             const text = inputField.value.trim();
-            const isEmpty = text.length === 0;
+            const isEmpty = forceIsEmpty !== null ? forceIsEmpty : (text.length === 0);
 
-            fetch(`/api/v1/learning/active?sessionId=${sessionId}&isEmpty=${isEmpty}`, {
-                method: 'POST'
-            }).then(res => {
-                if (!res.ok) console.error("활동 보고 실패:", res.status);
-            });
+            fetch(`/api/v1/learning/active?sessionId=${sessionId}&isEmpty=${isEmpty}`, { method: 'POST' })
+                .catch(e => console.error("활동 보고 에러:", e));
 
             activityThrottle = null;
-        }, 1000); // 1초 간격으로 보고
+        }, 1000);
 
-        if (inputField.value.trim().length > 0) {
+        if (inputField.value.trim().length > 0 && !character.className.includes('listening')) {
             updateUIState('listening');
         }
     }
 
-    // [핵심] 입력창에 글이 남아있는 동안 1.5초마다 "나 아직 작성 중이야"라고 신호를 보냄
-    // 백엔드 타이머가 3초이므로 1.5초마다 보내면 절대 타이머가 만료되지 않습니다.
+    // 1.5초마다 강제 체크하여 N:1 방어 (텍스트가 있거나, 녹음중이거나, 변환중이면 AI 응답 차단)
     setInterval(() => {
-        if (inputField.value.trim().length > 0) {
-            reportUserActivity();
+        const text = inputField.value.trim();
+        if (text.length > 0 || isRecording || isVoiceProcessing) {
+            reportUserActivity(false); // isEmpty = false 강제 전송
         }
     }, 1500);
 
-    inputField.addEventListener('input', reportUserActivity);
+    inputField.addEventListener('input', () => reportUserActivity());
 
-    // --- 3. 채팅 전송 및 폴링 ---
+    // ==========================================
+    // 4. 음성 인식 (STT) 제어
+    // ==========================================
+    async function toggleRecording() {
+        stopAiAudio(); // 녹음 버튼 누르면 즉시 AI 조용히 시키기
+
+        if (isRecording) {
+            isAutoMode = false;
+            stopRecording();
+            return;
+            isAutoMode = true;
+        }
+
+        try {
+            // 1. 마이크 권한 요청 및 스트림 획득
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // 2. 마이크 스트림을 얻자마자 무음 감지기 작동
+            startSilenceDetection(stream);
+
+            // 3. 녹음기 초기화
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+            // 4. 녹음이 '정지'되었을 때 서버로 전송하는 핵심 로직
+            mediaRecorder.onstop = async () => {
+                isVoiceProcessing = true; // STT 통신 시작 (응답 차단 락 유지)
+                micBtn.textContent = '🎤';
+                micBtn.classList.remove('recording');
+
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'voice.webm');
+
+                try {
+                    const response = await fetch(`/api/v1/learning/audio?sessionId=${sessionId}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const transcript = await response.text();
+                        appendMessage("🎤 " + transcript, 'user-msg');
+                        isVoiceProcessing = false; // 변환 완료, 응답 락 해제
+                        startResponseCheck(); // AI 응답 기다리기
+                    } else {
+                        throw new Error("STT 실패");
+                    }
+                } catch (error) {
+                    console.error(error);
+                    appendMessage("음성 인식에 실패했어. 다시 말해줄래?", 'ai-msg');
+                    isVoiceProcessing = false;
+                }
+
+                stream.getTracks().forEach(t => t.stop()); // 마이크 하드웨어 끄기
+            };
+
+            // 5. 녹음 시작
+            mediaRecorder.start();
+            isRecording = true;
+            micBtn.textContent = '⏹️';
+            micBtn.classList.add('recording');
+            updateUIState('listening');
+
+        } catch (err) {
+            console.error(err);
+            alert("마이크 사용 권한을 허용해주세요!");
+        }
+    }
+
+    // ==========================================
+    // 5. 무음 감지 및 녹음 종료 로직
+    // ==========================================
+    let audioContext;
+    let analyser;
+    let microphone;
+    let silenceStart = null;
+    const SILENCE_THRESHOLD = 0.01; // 감도 조절 (필요시 0.03 등으로 변경)
+    const SILENCE_DURATION = 1500; // 1.5초 무음 시 종료
+
+    async function startSilenceDetection(stream) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Float32Array(bufferLength);
+
+        function checkSilence() {
+            analyser.getFloatTimeDomainData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i] * dataArray[i];
+            }
+            const rms = Math.sqrt(sum / bufferLength);
+
+            if (rms < SILENCE_THRESHOLD) {
+                if (!silenceStart) silenceStart = Date.now();
+                else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                    if (isRecording) {
+                        // 무음 감지 시 자동으로 stopRecording 호출
+                        stopRecording();
+                        silenceStart = null;
+                        return;
+                    }
+                }
+            } else {
+                silenceStart = null;
+            }
+            if (isRecording) requestAnimationFrame(checkSilence);
+        }
+        checkSilence();
+    }
+
+    function stopRecording() {
+        // mediaRecorder.stop()이 호출되면 자동으로 위의 mediaRecorder.onstop 로직이 실행됨
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        isRecording = false;
+        updateUIState('analyzing');
+
+        // 메모리 누수 방지: 무음 감지기 깔끔하게 끄기
+        if (typeof audioContext !== 'undefined' && audioContext.state !== 'closed') {
+            audioContext.close();
+        }
+        silenceStart = null;
+    }
+
+    // ==========================================
+    // 6. 텍스트 채팅 제어
+    // ==========================================
     function handleEnter(e) {
         if (e.key === 'Enter') sendMessage();
     }
@@ -180,8 +306,7 @@
         if (!text) return;
 
         appendMessage(text, 'user-msg');
-        inputField.value = ''; // 입력창을 비움 -> 이제 Heartbeat가 isEmpty=true를 보내기 시작함
-
+        inputField.value = '';
         updateUIState('listening');
 
         try {
@@ -190,17 +315,18 @@
                 headers: { 'Content-Type': 'text/plain' },
                 body: text
             });
-
             startResponseCheck();
         } catch (error) {
             updateUIState('idle');
-            appendMessage("연결 오류 발생! 다시 시도해줘.", 'ai-msg');
+            appendMessage("연결 오류 발생!", 'ai-msg');
         }
     }
 
+    // ==========================================
+    // 7. 폴링 및 응답 수신 (TTS 재생)
+    // ==========================================
     function startResponseCheck() {
         if (checkInterval) return;
-
         loading.textContent = "친구의 대답을 기다리는 중... 💬";
 
         checkInterval = setInterval(async () => {
@@ -208,15 +334,39 @@
                 const response = await fetch(`/api/v1/learning/response?sessionId=${sessionId}`);
 
                 if (response.status === 200) {
-                    const reply = await response.text();
+                    const rawText = await response.text();
                     clearInterval(checkInterval);
                     checkInterval = null;
 
-                    updateUIState('responding');
-                    appendMessage(reply, 'ai-msg');
-                    setTimeout(() => updateUIState('idle'), 2000);
+                    try {
+                        const data = JSON.parse(rawText);
+                        appendMessage(data.text, 'ai-msg');
+                        updateUIState('speaking');
+
+                        if (data.audio) {
+                            currentAudio = new Audio("data:audio/mp3;base64," + data.audio);
+                            currentAudio.play().catch(e => console.error("오디오 재생 실패:", e));
+
+                            // 💡 TTS 재생이 끝나면 자동으로 녹음 다시 켜기!
+                            currentAudio.onended = () => {
+                                updateUIState('idle');
+                                currentAudio = null;
+
+                                setTimeout(() => {
+
+                                    if (!isRecording && isAutoMode) {
+                                        toggleRecording();
+                                    }
+                                }, 1000);
+                            };
+                        } else {
+                            setTimeout(() => updateUIState('idle'), 2000);
+                        }
+                    } catch (parseError) {
+                        appendMessage(rawText, 'ai-msg');
+                        updateUIState('idle');
+                    }
                 } else if (response.status === 204) {
-                    // 서버가 아직 대기 중이거나 분석 중
                     updateUIState('analyzing');
                 }
             } catch (e) {
@@ -225,7 +375,9 @@
         }, 1000);
     }
 
-    // --- 기타 유틸리티 (메시지 추가, 이모티콘 등) ---
+    // ==========================================
+    // 8. 기타 기능 (요약, 이모티콘 등)
+    // ==========================================
     function appendMessage(text, className) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${className}`;
@@ -234,9 +386,7 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function toggleEmoticonMenu() {
-        emoticonMenu.classList.toggle('active');
-    }
+    function toggleEmoticonMenu() { emoticonMenu.classList.toggle('active'); }
 
     function insertEmoticon(code) {
         inputField.value += (inputField.value.endsWith(' ') ? '' : ' ') + code + ' ';
@@ -245,22 +395,26 @@
         reportUserActivity();
     }
 
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.emoticon-btn') && !e.target.closest('.emoticon-menu')) {
+            emoticonMenu.classList.remove('active');
+        }
+    });
+
     async function endConversation() {
         const topic = prompt("오늘 복습한 핵심 키워드가 뭐야?", "자유 주제");
         if(!topic) return;
 
-        chatSection.style.display = 'none';
-        summarySection.style.display = 'block';
+        document.getElementById('chat-section').style.display = 'none';
+        document.getElementById('summary-section').style.display = 'block';
         document.querySelector('.end-btn').style.display = 'none';
 
         try {
-            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, {
-                method: 'POST'
-            });
-            const summary = await response.text();
-            summaryContent.innerHTML = `<strong>"${topic}"</strong> 요약 완료! 대시보드에서 확인해 봐. 😊`;
+            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, { method: 'POST' });
+            await response.text();
+            document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 요약 완료! 대시보드에서 확인해 봐. 😊`;
         } catch (error) {
-            summaryContent.innerHTML = "요약 실패! 😭";
+            document.getElementById('summaryContent').innerHTML = "요약 실패! 😭";
         }
     }
 
@@ -268,6 +422,5 @@
         window.location.href = `/dashboard.html?sessionId=${sessionId}`;
     }
 </script>
-
 </body>
 </html>

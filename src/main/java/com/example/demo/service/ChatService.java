@@ -1,8 +1,9 @@
 package com.example.demo.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value; // 올바른 Import로 수정
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -10,7 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +31,11 @@ public class ChatService {
     private String systemPrompt;
 
     private final StringRedisTemplate redisTemplate;
+    private final SttService sttService;
+    private final TtsService ttsService;
+    private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
+
     private final ConcurrentHashMap<String, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
 
@@ -37,18 +44,30 @@ public class ChatService {
         String lastSeenKey = "activity:lastSeen:" + sessionId;
         long now = System.currentTimeMillis();
 
-        // 1. 입력창 상태 저장
         redisTemplate.opsForValue().set(activityKey, String.valueOf(isEmpty), 10, TimeUnit.SECONDS);
-        // 2. 마지막 활동 시간(Timestamp) 기록
         redisTemplate.opsForValue().set(lastSeenKey, String.valueOf(now), 10, TimeUnit.SECONDS);
 
         resetDebounceTimer(sessionId);
     }
 
     public void bufferMessage(String sessionId, String message) {
-        redisTemplate.opsForList().rightPush("buffer:" + sessionId, message);
-        redisTemplate.opsForValue().set("status:" + sessionId, "WAITING");
+        String bufferKey = "buffer:" + sessionId;
+        String statusKey = "status:" + sessionId;
+
+        redisTemplate.opsForList().rightPush(bufferKey, message);
+        redisTemplate.opsForValue().set(statusKey, "WAITING");
+
         resetDebounceTimer(sessionId);
+    }
+
+    public String processAudioMessage(String sessionId, MultipartFile audioFile) {
+        String transcript = sttService.processSpeech(audioFile);
+
+        if (transcript != null && !transcript.contains("에러") && !transcript.contains("실패")) {
+            bufferMessage(sessionId, transcript);
+            return transcript;
+        }
+        return null;
     }
 
     public String getStoredResponse(String sessionId) {
@@ -56,9 +75,9 @@ public class ChatService {
         String responseKey = "response:" + sessionId;
 
         if ("READY".equals(redisTemplate.opsForValue().get(statusKey))) {
-            String aiResponse = redisTemplate.opsForValue().get(responseKey);
+            String jsonResponse = redisTemplate.opsForValue().get(responseKey);
             redisTemplate.delete(List.of(statusKey, responseKey));
-            return aiResponse;
+            return jsonResponse;
         }
         return null;
     }
@@ -67,6 +86,7 @@ public class ChatService {
         if (scheduledTasks.containsKey(sessionId)) {
             scheduledTasks.get(sessionId).cancel(false);
         }
+
         ScheduledFuture<?> future = scheduler.schedule(() -> processAndGenerateResponse(sessionId), 3, TimeUnit.SECONDS);
         scheduledTasks.put(sessionId, future);
     }
@@ -79,24 +99,21 @@ public class ChatService {
         String lastSeenStr = redisTemplate.opsForValue().get(lastSeenKey);
         long now = System.currentTimeMillis();
 
-        // 검증 로직 A: 입력창에 글이 남아있다면 절대 응답하지 않음
         if ("false".equals(isEmptyStatus)) {
-            log.info("사용자 입력창에 텍스트 잔존 - 응답 연기: {}", sessionId);
+            log.info("Status check: User is still typing. Session: {}", sessionId);
             resetDebounceTimer(sessionId);
             return;
         }
 
-        // 검증 로직 B: 마지막 활동(Heartbeat) 이후 아직 3초가 지나지 않았다면 연기
         if (lastSeenStr != null) {
             long lastSeen = Long.parseLong(lastSeenStr);
-            if (now - lastSeen < 2800) { // 3초에 근접한 시간차 계산
-                log.info("최근 활동 감지 - 응답 연기: {}", sessionId);
+            if (now - lastSeen < 2800) {
+                log.info("Status check: Recent activity detected. Session: {}", sessionId);
                 resetDebounceTimer(sessionId);
                 return;
             }
         }
 
-        // 모든 가드를 통과했을 때만 OpenAI 호출
         executeAiResponse(sessionId);
     }
 
@@ -111,25 +128,37 @@ public class ChatService {
 
         try {
             String combinedPrompt = String.join("\n", messages);
-            // 응답 생성 전 버퍼 선삭제 (중복 방지)
             redisTemplate.delete(bufferKey);
 
-            String aiResponse = callOpenAiChat(combinedPrompt);
+            String aiResponseText = callOpenAiChat(combinedPrompt);
+            byte[] audioBytes = ttsService.generateSpeech(aiResponseText);
+            String audioBase64 = "";
 
-            redisTemplate.opsForValue().set("response:" + sessionId, aiResponse, 5, TimeUnit.MINUTES);
+            if (audioBytes != null) {
+                audioBase64 = Base64.getEncoder().encodeToString(audioBytes);
+            }
+
+            Map<String, String> responseData = new HashMap<>();
+            responseData.put("text", aiResponseText);
+            responseData.put("audio", audioBase64);
+
+            String jsonResult = objectMapper.writeValueAsString(responseData);
+
+            redisTemplate.opsForValue().set("response:" + sessionId, jsonResult, 5, TimeUnit.MINUTES);
             redisTemplate.opsForValue().set("status:" + sessionId, "READY");
 
             scheduledTasks.remove(sessionId);
-            log.info("AI 응답 생성 완료: {}", sessionId);
+            log.info("AI response and TTS generated successfully for session: {}", sessionId);
+
         } catch (Exception e) {
-            log.error("OpenAI 통신 중 에러: {}", e.getMessage());
-            // 실패 시 사용자에게 알리기 위해 상태 업데이트
+            log.error("Error during AI response generation: {}", e.getMessage());
             redisTemplate.opsForValue().set("status:" + sessionId, "ERROR");
         }
     }
 
     private String callOpenAiChat(String prompt) {
         String url = "https://api.openai.com/v1/chat/completions";
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
@@ -137,7 +166,6 @@ public class ChatService {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", "gpt-4o");
         requestBody.put("messages", List.of(
-                // 주입받은 systemPrompt 사용
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", prompt)
         ));
@@ -150,6 +178,7 @@ public class ChatService {
             Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
             return (String) message.get("content");
         }
-        return "응답 생성 실패";
+
+        return "응답을 생성할 수 없습니다.";
     }
 }
