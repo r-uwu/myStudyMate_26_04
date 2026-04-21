@@ -1,4 +1,4 @@
-package com.example.demo.dto;
+package com.workspace.dto;
 
 public record StudyRequest(
         String topic,      // 학습 주제

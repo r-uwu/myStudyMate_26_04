@@ -1,45 +1,53 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '4.0.5'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'java'
+    id 'org.springframework.boot' version '3.2.4' // 안정적인 3.x 버전 권장
+    id 'io.spring.dependency-management' version '1.1.4'
 }
 
-group = 'com.KoreaIT.ysh.demo'
+group = 'com.workspace'
 version = '0.0.1-SNAPSHOT'
 description = 'Demo project for Spring Boot'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
 }
-
 dependencies {
+
+    implementation 'org.springframework.boot:spring-boot-starter'
     // Web & Backend Core
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // Audio Processing (External API SDKs - e.g., Google Cloud)
+    // Google Cloud SDK (Speech & TTS)
     implementation 'com.google.cloud:google-cloud-speech:4.38.0'
     implementation 'com.google.cloud:google-cloud-texttospeech:2.42.0'
 
-    // Database & Monitoring
-    runtimeOnly 'com.h2database:h2' // 초기 개발용
-    implementation 'org.springframework.boot:spring-boot-starter-actuator' // 상태 모니터링
+    // Database
+    //runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.mysql:mysql-connector-j'
 
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis' //redis
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 }
+
+
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
 }
 

@@ -1,4 +1,4 @@
-package com.example.demo.service;
+package com.workspace.service;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;

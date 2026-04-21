@@ -1,6 +1,6 @@
-package com.example.demo.service;
+package com.workspace.service;
 
-import com.example.demo.ChatMessage;
+import com.workspace.ChatMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
