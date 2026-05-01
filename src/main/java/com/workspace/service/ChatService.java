@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -66,6 +67,21 @@ public class ChatService {
     }
 
     public String processAudioMessage(String sessionId, MultipartFile audioFile) {
+
+        try {
+            byte[] audioBytes = audioFile.getBytes();
+
+            // 1. RMS(에너지) 계산
+            double rms = calculateRMS(audioBytes);
+            log.info("Audio RMS Energy: {}", rms);
+
+            // 2. 임계값(Threshold) 설정
+            // (보통 -40dB ~ -50dB 혹은 원시 값 기준 500~1000 사이, 마이크마다 튜닝 필요)
+            if (rms < 500.0) {
+                log.info("무음 혹은 노이즈로 판단되어 STT 중단 (RMS: {})", rms);
+                return null;
+            }
+
         if (audioFile.getSize() < 1000) {
             log.info("Ignored empty audio chunk. Size: {} bytes", audioFile.getSize());
             return null;
@@ -77,7 +93,23 @@ public class ChatService {
             executeAiResponseStreaming(sessionId, transcript);
             return transcript;
         }
+
+        } catch (IOException e) {
+            log.error("오디오 분석 중 에러", e);
+        }
         return null;
+    }
+
+    private double calculateRMS(byte[] audioData) {
+        long sum = 0;
+        // 16-bit PCM 데이터는 2바이트가 하나의 샘플입니다.
+        for (int i = 0; i < audioData.length - 1; i += 2) {
+            // Little-Endian 기준 바이트 결합
+            short sample = (short) ((audioData[i + 1] << 8) | (audioData[i] & 0xFF));
+            sum += (long) sample * sample;
+        }
+        double average = (double) sum / (audioData.length / 2);
+        return Math.sqrt(average);
     }
 
     public void processTextMessage(String sessionId, String message) {

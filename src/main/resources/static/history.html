@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학습 요약 페이지</title>
+    <style>
+        :root {
+            --primary-color: rgb(110, 142, 181);
+            --primary-light: rgb(161, 179, 198);
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --header-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --card-bg: #1e293b;
+                --header-bg: #1e293b;
+                --text-main: #f8fafc;
+                --text-muted: #94a3b8;
+                --border-color: #334155;
+                --primary-color: rgb(125, 160, 205);
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            transition: background-color 0.3s ease;
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 800px;
+            padding: 3rem 1.5rem;
+            box-sizing: border-box;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.5rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.025em;
+        }
+
+        .back-btn {
+            padding: 0.6rem 1.25rem;
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .back-btn:hover {
+            background-color: var(--bg-color);
+            border-color: var(--text-muted);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Date Filter Controls */
+        .filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 1.25rem;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .date-input {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .date-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .search-btn {
+            padding: 0.5rem 1.25rem;
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-left: auto;
+        }
+
+        .search-btn:hover {
+            background-color: rgb(90, 122, 161);
+        }
+
+        .search-btn:active {
+            transform: scale(0.98);
+        }
+
+        #statusMessage {
+            text-align: center;
+            padding: 4rem 2rem;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .log-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .log-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary-color);
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            animation: cardFadeIn 0.4s ease-out forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        .log-card:nth-child(n) {
+            animation-delay: calc(n * 0.05s);
+        }
+
+        @keyframes cardFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .log-topic {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .log-date {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            white-space: nowrap;
+            margin-left: 1rem;
+        }
+
+        .log-summary {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text-muted);
+            white-space: pre-line;
+        }
+
+        /* Pagination Controls */
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 2.5rem;
+        }
+
+        .page-btn {
+            padding: 0.5rem 0.8rem;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background-color: var(--bg-color);
+            border-color: var(--primary-light);
+        }
+
+        .page-btn.active {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border-color: var(--primary-color);
+            cursor: default;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: var(--bg-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <header>
+        <h1>학습 요약 페이지</h1>
+        <a href="/index.html" class="back-btn">새 대화 시작하기</a>
+    </header>
+
+    <div class="filter-container">
+        <div class="filter-group">
+            <span class="filter-label">시작일</span>
+            <input type="date" id="startDate" class="date-input">
+        </div>
+        <div class="filter-group">
+            <span class="filter-label">종료일</span>
+            <input type="date" id="endDate" class="date-input">
+        </div>
+        <button id="searchBtn" class="search-btn">검색</button>
+    </div>
+
+    <div id="statusMessage">학습 기록을 불러오는 중입니다...</div>
+
+    <div id="logGrid" class="log-grid" style="display: none;"></div>
+
+    <div id="paginationContainer" class="pagination-container" style="display: none;"></div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentSessionId = localStorage.getItem('msm_session_id');
+
+    const statusMessage = document.getElementById('statusMessage');
+    const logGrid = document.getElementById('logGrid');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const searchBtn = document.getElementById('searchBtn');
+
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+
+    // Default pagination state
+    let currentPage = 0;
+    const pageSize = 5;
+
+    // Set default dates (Last 30 days to Today)
+    function setDefaultDates() {
+        const today = new Date();
+        const past = new Date(today);
+        past.setDate(past.getDate() - 30);
+
+        endDateInput.value = today.toISOString().split('T')[0];
+        startDateInput.value = past.toISOString().split('T')[0];
+    }
+
+    async function loadLearningLogs(page = 0) {
+        if (!currentSessionId) {
+            statusMessage.innerHTML = "세션 정보가 없습니다. 대화를 먼저 진행해 주세요.";
+            return;
+        }
+
+        currentPage = page;
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+
+        try {
+            // Construct query parameters including pagination and date filters
+            const queryParams = new URLSearchParams({
+                sessionId: currentSessionId,
+                page: currentPage,
+                size: pageSize,
+                startDate: startDate ? `${startDate}T00:00:00` : '',
+                endDate: endDate ? `${endDate}T23:59:59` : ''
+            });
+
+            const response = await fetch(`/api/v1/learning/history?${queryParams.toString()}`);
+            if (!response.ok) throw new Error("Server response error");
+
+            const result = await response.json();
+
+            // Handle both Spring Data Page object or traditional Array fallback
+            const logs = result.content || (Array.isArray(result) ? result : []);
+            const totalPages = result.totalPages || 1;
+
+            if (!logs || logs.length === 0) {
+                logGrid.style.display = 'none';
+                paginationContainer.style.display = 'none';
+                statusMessage.style.display = 'block';
+                statusMessage.innerHTML = "해당 조건에 일치하는 학습 기록이 없습니다.";
+                return;
+            }
+
+            statusMessage.style.display = 'none';
+            logGrid.style.display = 'flex';
+            logGrid.innerHTML = '';
+
+            logs.forEach((log, index) => {
+                const card = document.createElement('div');
+                card.className = 'log-card';
+                card.style.animationDelay = `${index * 0.05}s`;
+
+                let formattedDate = "날짜 정보 없음";
+                const createdAtRaw = log.createdAt;
+
+                if (createdAtRaw) {
+                    const dateObj = Array.isArray(createdAtRaw)
+                        ? new Date(createdAtRaw[0], createdAtRaw[1]-1, createdAtRaw[2], createdAtRaw[3], createdAtRaw[4])
+                        : new Date(createdAtRaw);
+
+                    if (!isNaN(dateObj)) {
+                        formattedDate = dateObj.toLocaleString('ko-KR', {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit'
+                        });
+                    }
+                }
+
+                const topicText = log.topic || "자유 주제";
+                const summaryText = log.summary || "요약 내용이 없습니다.";
+
+                card.innerHTML = `
+                    <div class="log-header">
+                        <h3 class="log-topic">${topicText}</h3>
+                        <div class="log-date">${formattedDate}</div>
+                    </div>
+                    <div class="log-summary">${summaryText}</div>
+                `;
+                logGrid.appendChild(card);
+            });
+
+            renderPagination(totalPages);
+
+        } catch (error) {
+            console.error("Log loading failed:", error);
+            statusMessage.style.display = 'block';
+            logGrid.style.display = 'none';
+            paginationContainer.style.display = 'none';
+            statusMessage.innerHTML = "데이터를 가져오지 못했습니다. 서버 연결을 확인하세요.";
+        }
+    }
+
+    function renderPagination(totalPages) {
+        if (totalPages <= 1) {
+            paginationContainer.style.display = 'none';
+            return;
+        }
+
+        paginationContainer.style.display = 'flex';
+        paginationContainer.innerHTML = '';
+
+        // Prev Button
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'page-btn';
+        prevBtn.innerText = '이전';
+        prevBtn.disabled = currentPage === 0;
+        prevBtn.onclick = () => loadLearningLogs(currentPage - 1);
+        paginationContainer.appendChild(prevBtn);
+
+        // Page Numbers (Simple dynamic range logic)
+        let startPage = Math.max(0, currentPage - 2);
+        let endPage = Math.min(totalPages - 1, currentPage + 2);
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+            pageBtn.innerText = i + 1;
+            if (i !== currentPage) {
+                pageBtn.onclick = () => loadLearningLogs(i);
+            }
+            paginationContainer.appendChild(pageBtn);
+        }
+
+        // Next Button
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'page-btn';
+        nextBtn.innerText = '다음';
+        nextBtn.disabled = currentPage === totalPages - 1;
+        nextBtn.onclick = () => loadLearningLogs(currentPage + 1);
+        paginationContainer.appendChild(nextBtn);
+    }
+
+    // Event Listeners
+    searchBtn.addEventListener('click', () => {
+        loadLearningLogs(0); // Reset to first page on new search
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setDefaultDates();
+        loadLearningLogs(0);
+    });
+</script>
+</body>
+</html>
