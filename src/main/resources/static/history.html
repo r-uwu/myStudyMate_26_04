@@ -319,6 +319,7 @@
     async function loadLearningLogs(page = 0) {
         if (!currentSessionId) {
             statusMessage.innerHTML = "세션 정보가 없습니다. 대화를 먼저 진행해 주세요.";
+            statusMessage.innerHTML = `📝 세션(${currentSessionId})에 저장된 기록이 없습니다.`;
             return;
         }
 
