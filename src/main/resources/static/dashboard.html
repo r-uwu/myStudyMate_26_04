@@ -3,14 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title style="white-space: nowrap">학습 대시보드 📚</title>
+    <title>Mystudymate 통계 대시보드</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary-color: #4A90E2;
-            --bg-color: #F5F7FA;
-            --card-bg: #FFFFFF;
-            --text-main: #333333;
-            --text-muted: #888888;
+            --primary-color: rgb(110, 142, 181);
+            --primary-light: rgba(110, 142, 181, 0.2);
+            --secondary-color: rgb(161, 179, 198);
+            --accent-color: rgb(94, 234, 212);
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --card-bg: #1e293b;
+                --text-main: #f8fafc;
+                --text-muted: #94a3b8;
+                --border-color: #334155;
+                --primary-light: rgba(125, 160, 205, 0.2);
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            }
         }
 
         body {
@@ -21,12 +42,13 @@
             padding: 0;
             display: flex;
             justify-content: center;
+            line-height: 1.6;
         }
 
         .dashboard-container {
             width: 100%;
-            max-width: 800px;
-            padding: 2rem;
+            max-width: 1200px;
+            padding: 3rem 1.5rem;
             box-sizing: border-box;
         }
 
@@ -35,175 +57,269 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
-            border-bottom: 2px solid #E4E7EB;
-            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.5rem;
         }
 
         h1 {
             margin: 0;
-            font-size: 1.8rem;
-            color: var(--text-main);
+            font-size: 1.75rem;
+            font-weight: 700;
         }
 
-        .back-btn {
-            padding: 0.5rem 1rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
+        .nav-links a {
+            padding: 0.6rem 1.25rem;
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 0.9rem;
+            font-weight: 500;
             cursor: pointer;
             text-decoration: none;
-            transition: background-color 0.2s;
-            white-space: nowrap;
+            transition: all 0.2s ease;
+            margin-left: 0.5rem;
         }
 
-        .back-btn:hover {
-            background-color: #357ABD;
+        .nav-links a:hover {
+            background-color: var(--bg-color);
+            border-color: var(--text-muted);
         }
 
-        /* 상태 메시지 (로딩, 에러, 빈 값) */
-        #statusMessage {
-            text-align: center;
-            padding: 3rem;
-            font-size: 1.2rem;
-            color: var(--text-muted);
-            background: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        .nav-links a.active {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border-color: var(--primary-color);
         }
 
-        /* 카드 그리드 레이아웃 */
-        .log-grid {
+        /* Dashboard Grid Layout */
+        .chart-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(12, 1fr);
             gap: 1.5rem;
         }
 
-        /* 개별 학습 로그 카드 */
-        .log-card {
+        .chart-card {
             background-color: var(--card-bg);
             border-radius: 12px;
             padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
         }
 
-        .log-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        .chart-card h3 {
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+            color: var(--text-main);
+            font-weight: 600;
         }
 
-        .log-date {
-            font-size: 0.85rem;
+        .chart-container {
+            position: relative;
+            flex-grow: 1;
+            min-height: 250px;
+            width: 100%;
+        }
+
+        /* Span configurations for different charts */
+        .col-span-8 { grid-column: span 8; }
+        .col-span-4 { grid-column: span 4; }
+        .col-span-6 { grid-column: span 6; }
+        .col-span-12 { grid-column: span 12; }
+
+        @media (max-width: 992px) {
+            .col-span-8, .col-span-4, .col-span-6 {
+                grid-column: span 12;
+            }
+        }
+
+        /* Summary Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-title {
+            font-size: 0.9rem;
             color: var(--text-muted);
             margin-bottom: 0.5rem;
+            font-weight: 500;
         }
 
-        .log-topic {
-            font-size: 1.2rem;
+        .stat-value {
+            font-size: 2rem;
             font-weight: 700;
-            color: var(--primary-color);
-            margin: 0 0 1rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #E4E7EB;
-        }
-
-        .log-summary {
-            font-size: 0.95rem;
-            line-height: 1.6;
             color: var(--text-main);
-            white-space: pre-line; /* \n 줄바꿈을 화면에 적용 */
-            flex-grow: 1;
         }
-
     </style>
 </head>
 <body>
 
 <div class="dashboard-container">
     <header>
-        <h1 style="white-space: nowrap">학습 대시보드 📚</h1>
-        <a href="/index.html" class="back-btn">새 대화 시작하기</a>
+        <h1>학습 통계 대시보드</h1>
+        <div class="nav-links">
+            <a href="/summary.html">학습 요약표</a>
+            <a href="/dashboard.html" class="active">통계 대시보드</a>
+        </div>
     </header>
 
-    <div id="statusMessage">학습 기록을 불러오는 중입니다... ⏳</div>
+    <!-- KPI Summary Section -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-title">총 학습 시간 (이번 주)</div>
+            <div class="stat-value" id="totalHours">14.5h</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">완료한 세션</div>
+            <div class="stat-value" id="completedSessions">24건</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">연속 학습일</div>
+            <div class="stat-value" id="streakDays">5일</div>
+        </div>
+    </div>
 
-    <div id="logGrid" class="log-grid" style="display: none;"></div>
+    <!-- Charts Section -->
+    <div class="chart-grid">
+        <!-- Weekly Study Trend (Area Chart) -->
+        <div class="chart-card col-span-8">
+            <h3>주간 학습 시간 추이</h3>
+            <div class="chart-container">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Subject Distribution (Doughnut Chart) -->
+        <div class="chart-card col-span-4">
+            <h3>주제별 학습 비중</h3>
+            <div class="chart-container">
+                <canvas id="subjectChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Monthly Activity (Bar Chart) -->
+        <div class="chart-card col-span-12">
+            <h3>월간 학습 활동량</h3>
+            <div class="chart-container" style="min-height: 300px;">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-    // 1. URL에서 sessionId 가져오기 (예: dashboard.html?sessionId=session_123)
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentSessionId = localStorage.getItem('msm_session_id');
-    const statusMessage = document.getElementById('statusMessage');
-    const logGrid = document.getElementById('logGrid');
+    // Set common chart options for responsive design and dark mode adaptation
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim();
 
-    async function loadLearningLogs() {
-        if (!currentSessionId) {
-            statusMessage.innerHTML = "❌ 세션 정보가 없습니다. 대화를 먼저 진행해 주세요.";
-            return;
-        }
+    Chart.defaults.color = textColor;
+    Chart.defaults.font.family = "'Pretendard', sans-serif";
 
-        try {
-            // 2. 서버 API 호출
-            const response = await fetch(`/api/v1/learning/history?sessionId=${currentSessionId}`);
-            if (!response.ok) throw new Error("서버 응답 오류");
-
-            const logs = await response.json();
-
-            // 3. 데이터 유무 확인
-            if (!logs || logs.length === 0) {
-                statusMessage.innerHTML = `📝 세션(${currentSessionId})에 저장된 기록이 없습니다.<br>AI와 대화를 나누고 요약을 저장해 보세요!`;
-                return;
-            }
-
-            statusMessage.style.display = 'none';
-            logGrid.style.display = 'grid';
-            logGrid.innerHTML = ''; // 기존 내용 초기화
-
-            // 4. 카드 생성
-            logs.forEach(log => {
-                const card = document.createElement('div');
-                card.className = 'log-card';
-
-                // 날짜 포맷팅
-                const createdAtRaw = log.createdAt; // 서버에서 온 데이터
-                if (createdAtRaw) {
-                    // 서버에서 온 데이터가 배열 형태([2026, 4, 13, ...])일 경우와 문자열일 경우 모두 대응
-                    const dateObj = Array.isArray(createdAtRaw)
-                        ? new Date(createdAtRaw[0], createdAtRaw[1]-1, createdAtRaw[2], createdAtRaw[3], createdAtRaw[4])
-                        : new Date(createdAtRaw);
-
-                    if (!isNaN(dateObj)) {
-                        formattedDate = dateObj.toLocaleString('ko-KR', {
-                            year: 'numeric', month: 'long', day: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
-                        });
-                    }
+    // 1. Weekly Trend Chart (Area Line Chart)
+    const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: ['월', '화', '수', '목', '금', '토', '일'],
+            datasets: [{
+                label: '학습 시간 (시간)',
+                data: [1.5, 2.0, 1.0, 3.5, 2.0, 4.0, 0.5],
+                borderColor: 'rgb(110, 142, 181)',
+                backgroundColor: 'rgba(110, 142, 181, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor }
+                },
+                x: {
+                    grid: { display: false }
                 }
-
-                // 💡 핵심: DB 필드명(topic, summary)과 정확히 일치시켜야 함
-                const topicText = log.topic || "자유 주제";
-                const summaryText = log.summary || "요약 내용이 없습니다.";
-
-                card.innerHTML = `
-                    <div class="log-date">🕒 ${formattedDate}</div>
-                    <h3 class="log-topic">📌 ${topicText}</h3>
-                    <div class="log-summary">${summaryText}</div>
-                `;
-                logGrid.appendChild(card);
-            });
-
-        } catch (error) {
-            console.error("로그 로딩 실패:", error);
-            statusMessage.innerHTML = "⚠️ 데이터를 가져오지 못했습니다. 서버 연결을 확인하세요.";
+            },
+            plugins: {
+                legend: { display: false }
+            }
         }
-    }
+    });
 
-    window.addEventListener('DOMContentLoaded', loadLearningLogs);
+    // 2. Subject Distribution Chart (Doughnut Chart)
+    const ctxSubject = document.getElementById('subjectChart').getContext('2d');
+    new Chart(ctxSubject, {
+        type: 'doughnut',
+        data: {
+            labels: ['Spring Boot', 'JavaScript', 'Database', 'CS Foundation'],
+            datasets: [{
+                data: [45, 25, 20, 10],
+                backgroundColor: [
+                    'rgb(110, 142, 181)',
+                    'rgb(161, 179, 198)',
+                    'rgb(94, 234, 212)',
+                    'rgb(203, 213, 225)'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { padding: 20 }
+                }
+            }
+        }
+    });
+
+    // 3. Monthly Activity Chart (Bar Chart)
+    const ctxActivity = document.getElementById('activityChart').getContext('2d');
+    new Chart(ctxActivity, {
+        type: 'bar',
+        data: {
+            labels: ['1주차', '2주차', '3주차', '4주차'],
+            datasets: [{
+                label: '생성된 요약본 수',
+                data: [12, 19, 15, 22],
+                backgroundColor: 'rgb(110, 142, 181)',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
 </script>
 </body>
 </html>

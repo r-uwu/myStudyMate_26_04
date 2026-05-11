@@ -44,6 +44,9 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+    implementation 'com.github.codemonstur:embedded-redis:1.4.3'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
+
 }
 
 

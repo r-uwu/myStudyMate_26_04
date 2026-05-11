@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.workspace.mapper.LearningStatMapper">
+
+    <!-- Update table name to match JPA entity mapping -->
+    <select id="selectSubjectStats" resultType="com.workspace.dto.SubjectStatResponse">
+        SELECT
+            topic AS subjectName,
+            COUNT(id) AS studyCount
+        FROM
+            study_record
+        WHERE
+            session_id = #{sessionId}
+        GROUP BY
+            topic
+        ORDER BY
+            studyCount DESC
+            LIMIT 5
+    </select>
+
+    <!-- Update table name to match JPA entity mapping -->
+    <select id="selectWeeklyStats" resultType="com.workspace.dto.WeeklyStatResponse">
+        SELECT
+            CONCAT(WEEK(created_at, 1) - WEEK(DATE_SUB(created_at, INTERVAL DAYOFMONTH(created_at) - 1 DAY), 1) + 1, '주차') AS weekLabel,
+            COUNT(id) AS summaryCount
+        FROM
+            study_record
+        WHERE
+            session_id = #{sessionId}
+          AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+        GROUP BY
+            weekLabel
+        ORDER BY
+            created_at ASC
+    </select>
+
+</mapper>

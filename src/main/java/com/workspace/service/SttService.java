@@ -43,40 +43,46 @@ public class SttService {
             body.add("model", "whisper-1");
             body.add("response_format", "verbose_json");
             body.add("temperature", 0.0);
-            body.add("prompt", "이것은 학생이 설명하는 스터디 대화입니다.");
+            body.add("prompt", "학습 내용을 설명하는 한국어 음성입니다.");
             body.add("language", "ko");
 
             HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+            Map<String, Object> responseBody = response.getBody();
 
-            if (response.getBody() != null && response.getBody().containsKey("text")) {
-                Map<String, Object> responseBody = response.getBody();
+            if (responseBody != null && responseBody.containsKey("text")) {
                 String transcript = (String) responseBody.get("text");
 
-                // --- 💡 무음 확률(no_speech_prob) 체크 로직 시작 ---
                 if (responseBody.containsKey("segments")) {
                     List<Map<String, Object>> segments = (List<Map<String, Object>>) responseBody.get("segments");
                     if (!segments.isEmpty()) {
-                        // 첫 번째 세그먼트의 무음 확률 추출
-                        Object noSpeechProbObj = segments.get(0).get("no_speech_prob");
-                        if (noSpeechProbObj != null) {
-                            double noSpeechProb = Double.parseDouble(noSpeechProbObj.toString());
+                        Map<String, Object> firstSegment = segments.get(0);
 
-                            // 무음 확률이 0.6(60%)을 넘으면 환각으로 간주하고 중단
-                            if (noSpeechProb > 0.6) {
-                                log.warn("⚠️ Whisper 환각 감지 (확률: {}), 텍스트: {}", noSpeechProb, transcript);
-                                return null;
-                            }
+                        double noSpeechProb = Double.parseDouble(firstSegment.get("no_speech_prob").toString());
+                        double avgLogprob = Double.parseDouble(firstSegment.get("avg_logprob").toString());
+
+                        log.info("STT 분석 결과 - Text: {}, NoSpeechProb: {}, AvgLogprob: {}", transcript, noSpeechProb, avgLogprob);
+
+                        // 1. 무음 확률이 높거나 확신도가 지나치게 낮은 경우 차단
+                        if (noSpeechProb > 0.6 || avgLogprob < -1.0) {
+                            log.warn("⚠️ Whisper 환각 감지 및 차단 (NoSpeech: {}, Logprob: {})", noSpeechProb, avgLogprob);
+                            return null;
+                        }
+
+                        // 2. 특정 뉴스/방송 관련 키워드 패턴 매칭
+                        if (transcript.matches(".*(뉴스 스토리|시청해주셔서|채널|구독|MBC|KBS|SBS|---|신영증권|자막).*")) {
+                            log.warn("🚫 전형적인 방송 환각 패턴 감지: {}", transcript);
+                            return null;
+                        }
+
+                        // 3. 동일 문구 무한 반복(Looping) 감지
+                        if (isRepeating(transcript)) {
+                            log.warn("🚫 텍스트 무한 반복 루핑 감지: {}", transcript);
+                            return null;
                         }
                     }
                 }
-                // --- 💡 무음 확률 체크 로직 끝 ---
-
-                // 환각이 아님이 검증된 경우에만 DB 저장 진행
-//                explanationRepository.save(Explanation.builder()
-//                        .content(transcript)
-//                        .build());
 
                 long endTime = System.currentTimeMillis();
                 log.info("Whisper STT 처리 시간: {}ms", endTime - startTime);
@@ -88,5 +94,11 @@ public class SttService {
             log.error("Whisper STT 에러: {}", e.getMessage());
             return null;
         }
+    }
+
+    private boolean isRepeating(String text) {
+        if (text == null || text.length() < 15) return false;
+        String half = text.substring(0, text.length() / 2).trim();
+        return text.replace(half, "").length() < (text.length() / 4);
     }
 }
