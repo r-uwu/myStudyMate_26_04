@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mystudymate 학습 요약표</title>
+    <style>
+        :root {
+            --primary-color: #6e8eb5;
+            --primary-light: #eff4fa;
+            --secondary-color: #a1b3c6;
+            --accent-yellow: #f6de90;
+            --accent-brown: #856341;
+            --bg-color: #f4f7fa;
+            --card-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --shadow-soft: 0 10px 25px rgba(110, 142, 181, 0.08);
+            --shadow-hover: 0 15px 35px rgba(110, 142, 181, 0.15);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --card-bg: #1e293b;
+                --text-main: #f1f5f9;
+                --text-muted: #94a3b8;
+                --border-color: #334155;
+                --primary-light: rgba(110, 142, 181, 0.15);
+                --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.3);
+                --shadow-hover: 0 15px 35px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 1100px;
+            padding: 3rem 1.5rem;
+            box-sizing: border-box;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--primary-color); letter-spacing: -0.02em; }
+
+        .nav-links a {
+            padding: 0.6rem 1.25rem;
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-left: 0.5rem;
+        }
+
+        .nav-links a:hover { background-color: var(--bg-color); border-color: var(--secondary-color); }
+        .nav-links a.active { background-color: var(--primary-color); color: #ffffff; border-color: var(--primary-color); }
+        .nav-links a.home-btn { background-color: var(--accent-yellow); color: var(--accent-brown); border-color: var(--accent-yellow); }
+        .nav-links a.home-btn:hover { filter: brightness(0.95); }
+
+        /* 세련된 그리드 & 카드 디자인 */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+
+        .summary-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.8rem;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid var(--border-color);
+            border-top: 5px solid var(--primary-color); /* 상단 포인트 라인 */
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem;
+        }
+
+        .topic-badge {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .date-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-body {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            line-height: 1.8;
+            background: var(--bg-color);
+            padding: 1.2rem;
+            border-radius: 12px;
+            flex-grow: 1;
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 5rem 0;
+            color: var(--text-muted);
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            border: 2px dashed var(--border-color);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <header>
+        <h1>나의 학습 요약표</h1>
+        <div class="nav-links">
+            <a href="/index.html" class="home-btn">💬 대화하기</a>
+            <a href="/summary.html" class="active">학습 요약표</a>
+            <a href="/dashboard.html">통계 대시보드</a>
+        </div>
+    </header>
+
+    <div class="summary-grid" id="summaryContainer">
+        <div class="empty-state" id="loadingState">
+            데이터를 불러오는 중입니다... 🏃‍♂️
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let sessionId = localStorage.getItem('msm_session_id');
+        if (!sessionId) sessionId = 'session_default';
+        loadHistoryData(sessionId);
+    });
+
+    async function loadHistoryData(sessionId) {
+        const container = document.getElementById('summaryContainer');
+
+        try {
+            const response = await fetch(`/api/v1/learning/history?sessionId=${sessionId}`);
+
+            if (response.ok) {
+                const historyList = await response.json();
+
+                if (historyList.length === 0) {
+                    container.innerHTML = `<div class="empty-state">아직 완료된 학습 세션이 없습니다.<br>채팅을 통해 첫 복습을 시작해보세요! 🚀</div>`;
+                    return;
+                }
+
+                container.innerHTML = '';
+
+                historyList.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'summary-card';
+
+                    // 💡 날짜 파싱 안정화 로직 (배열 & 문자열 모두 처리)
+                    let dateObj;
+                    if (Array.isArray(item.createdAt)) {
+                        // Jackson의 LocalDateTime 배열 형식: [연, 월, 일, 시, 분, 초]
+                        // JS의 month는 0부터 시작하므로 -1 처리
+                        dateObj = new Date(item.createdAt[0], item.createdAt[1] - 1, item.createdAt[2]);
+                    } else if (item.createdAt) {
+                        dateObj = new Date(item.createdAt);
+                    } else {
+                        dateObj = new Date();
+                    }
+
+                    // 날짜 유효성 검증
+                    let formattedDate = "날짜 정보 없음";
+                    if (!isNaN(dateObj.getTime())) {
+                        formattedDate = `${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <span class="topic-badge">📌 ${escapeHtml(item.topic || '자유 주제')}</span>
+                            <span class="date-text">🕒 ${formattedDate}</span>
+                        </div>
+                        <div class="card-body">${formatSummaryText(item.summary)}</div>
+                    `;
+                    container.appendChild(card);
+                });
+            } else {
+                throw new Error("API Response Error");
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="empty-state">데이터를 불러오는데 실패했습니다. 서버 상태를 확인해주세요. 💦</div>`;
+        }
+    }
+
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function formatSummaryText(text) {
+        if (!text) return "요약 내용이 없습니다.";
+        return escapeHtml(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
+</script>
+</body>
+</html>
