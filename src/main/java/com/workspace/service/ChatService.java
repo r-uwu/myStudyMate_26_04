@@ -22,12 +22,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -50,6 +54,12 @@ public class ChatService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
+    // Debouncing buffer tools
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
+    private final ConcurrentHashMap<String, ScheduledFuture<?>> debounceTasks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StringBuilder> messageBuffers = new ConcurrentHashMap<>();
+    private static final long DEBOUNCE_DELAY_MS = 2000;
+
     public SseEmitter subscribe(String sessionId) {
         SseEmitter emitter = new SseEmitter(300000L);
         emitters.put(sessionId, emitter);
@@ -60,60 +70,55 @@ public class ChatService {
 
         try {
             emitter.send(SseEmitter.event().name("connect").data("connected"));
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
 
         return emitter;
     }
 
     public String processAudioMessage(String sessionId, MultipartFile audioFile) {
-
         try {
-            byte[] audioBytes = audioFile.getBytes();
-
-            // 1. RMS(에너지) 계산
-            double rms = calculateRMS(audioBytes);
-            log.info("Audio RMS Energy: {}", rms);
-
-            // 2. 임계값(Threshold) 설정
-            // (보통 -40dB ~ -50dB 혹은 원시 값 기준 500~1000 사이, 마이크마다 튜닝 필요)
-            if (rms < 500.0) {
-                log.info("무음 혹은 노이즈로 판단되어 STT 중단 (RMS: {})", rms);
+            if (audioFile.getSize() < 1000) {
+                log.info("Ignored empty audio chunk. Size: {} bytes", audioFile.getSize());
                 return null;
             }
 
-        if (audioFile.getSize() < 1000) {
-            log.info("Ignored empty audio chunk. Size: {} bytes", audioFile.getSize());
-            return null;
-        }
+            // Removed flawed PCM RMS calculation on WebM binary data
+            String transcript = sttService.processSpeech(audioFile);
 
-        String transcript = sttService.processSpeech(audioFile);
-
-        if (transcript != null && !transcript.trim().isEmpty()) {
-            executeAiResponseStreaming(sessionId, transcript);
-            return transcript;
-        }
-
-        } catch (IOException e) {
-            log.error("오디오 분석 중 에러", e);
+            if (transcript != null && !transcript.trim().isEmpty()) {
+                bufferAndExecuteAsync(sessionId, transcript);
+                return transcript;
+            }
+        } catch (Exception e) {
+            log.error("Audio processing error", e);
         }
         return null;
     }
 
-    private double calculateRMS(byte[] audioData) {
-        long sum = 0;
-        // 16-bit PCM 데이터는 2바이트가 하나의 샘플입니다.
-        for (int i = 0; i < audioData.length - 1; i += 2) {
-            // Little-Endian 기준 바이트 결합
-            short sample = (short) ((audioData[i + 1] << 8) | (audioData[i] & 0xFF));
-            sum += (long) sample * sample;
-        }
-        double average = (double) sum / (audioData.length / 2);
-        return Math.sqrt(average);
+    public void processTextMessage(String sessionId, String message) {
+        bufferAndExecuteAsync(sessionId, message);
     }
 
-    public void processTextMessage(String sessionId, String message) {
-        executeAiResponseStreaming(sessionId, message);
+    private void bufferAndExecuteAsync(String sessionId, String text) {
+        // Append incoming text to session buffer
+        messageBuffers.computeIfAbsent(sessionId, k -> new StringBuilder()).append(text).append(" ");
+
+        // Cancel existing timer if user continues to speak/type
+        ScheduledFuture<?> existingTask = debounceTasks.get(sessionId);
+        if (existingTask != null) {
+            existingTask.cancel(false);
+        }
+
+        // Schedule new execution
+        ScheduledFuture<?> newTask = scheduler.schedule(() -> {
+            StringBuilder buffer = messageBuffers.remove(sessionId);
+            if (buffer != null && buffer.length() > 0) {
+                String combinedPrompt = buffer.toString().trim();
+                executeAiResponseStreaming(sessionId, combinedPrompt);
+            }
+        }, DEBOUNCE_DELAY_MS, TimeUnit.MILLISECONDS);
+
+        debounceTasks.put(sessionId, newTask);
     }
 
     private void executeAiResponseStreaming(String sessionId, String prompt) {
@@ -129,10 +134,27 @@ public class ChatService {
                 String url = "https://api.openai.com/v1/chat/completions";
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("model", "gpt-4o-mini");
-                requestBody.put("messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", prompt)
-                ));
+
+                // Construct conversation history payload
+                List<Map<String, Object>> messages = new ArrayList<>();
+                messages.add(Map.of("role", "system", "content", systemPrompt));
+
+                String historyKey = "history:" + sessionId;
+                List<String> history = redisTemplate.opsForList().range(historyKey, 0, -1);
+
+                if (history != null && !history.isEmpty()) {
+                    for (String entry : history) {
+                        if (entry.startsWith("User: ")) {
+                            String[] parts = entry.split("\\nAI: ");
+                            messages.add(Map.of("role", "user", "content", parts[0].substring(6)));
+                            if (parts.length > 1) {
+                                messages.add(Map.of("role", "assistant", "content", parts[1]));
+                            }
+                        }
+                    }
+                }
+                messages.add(Map.of("role", "user", "content", prompt));
+                requestBody.put("messages", messages);
                 requestBody.put("stream", true);
 
                 byte[] requestBytes = objectMapper.writeValueAsBytes(requestBody);
@@ -142,9 +164,9 @@ public class ChatService {
                     request.getHeaders().setBearerAuth(apiKey);
                     request.getBody().write(requestBytes);
                 }, response -> {
+                    StringBuilder sentenceBuffer = new StringBuilder();
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
                         String line;
-                        StringBuilder sentenceBuffer = new StringBuilder();
 
                         while ((line = reader.readLine()) != null) {
                             if (line.startsWith("data: ") && !line.equals("data: [DONE]")) {
@@ -165,7 +187,6 @@ public class ChatService {
                                             try {
                                                 sendChunkToClient(emitter, sentence, audioBytes);
                                             } catch (Exception e) {
-                                                log.info("사용자의 입력 개입으로 스트리밍을 중단합니다.");
                                                 break;
                                             }
                                         }
@@ -174,6 +195,15 @@ public class ChatService {
                             }
                         }
                     } finally {
+                        // Flush remaining buffer that did not end with punctuation
+                        String remainingSentence = sentenceBuffer.toString().trim();
+                        if (!remainingSentence.isEmpty()) {
+                            byte[] audioBytes = ttsService.generateSpeech(remainingSentence);
+                            try {
+                                sendChunkToClient(emitter, remainingSentence, audioBytes);
+                            } catch (Exception ignored) {}
+                        }
+
                         if (fullAiResponseBuffer.length() > 0) {
                             saveConversationHistory(sessionId, prompt, fullAiResponseBuffer.toString());
                         }
