@@ -374,7 +374,6 @@
 </div>
 
 <script>
-    /* 세션 ID 관리 - localStorage 연동 */
     let sessionId = localStorage.getItem('msm_session_id');
     if (!sessionId) {
         sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
@@ -388,224 +387,214 @@
     const micBtn = document.getElementById('micBtn');
 
     let globalStream = null;
-    let audioContext;
-    let analyser;
-    let silenceStart = null;
-    let currentAudio = null;
+    let audioContext, analyser, dataArray;
+
+    // Core State Flags
+    let isAutoMode = false;
+    let isPlaying = false;
+    let isWaitingForAi = false;
+    let isRecording = false;
+
+    // Recording & Queue Variables
     let mediaRecorder = null;
     let audioChunks = [];
-    let isRecording = false;
-    let isAutoMode = false;
+    let currentAudio = null;
     const audioQueue = [];
-    let isPlaying = false;
     let eventSource = null;
     let currentAiMsgDiv = null;
 
-    const SILENCE_THRESHOLD = 0.05;
-    const SPEECH_THRESHOLD = 0.08;
-    const SILENCE_DURATION = 2000;
+    // VAD Variables
+    let silenceStart = null;
+    let totalSilenceStart = null;
+    let hasSpokenInChunk = false;
+
+    // Thresholds
+    const SPEECH_THRESHOLD = 0.05;
+    const CHUNK_SILENCE_MS = 1500;  // 1.5s pause triggers chunk send
+    const MAX_SILENCE_MS = 8000;    // 8s total silence triggers AI
 
     function updateUIState(state) {
         character.className = `character-box state-${state}`;
-        // if (state === 'idle') { character.textContent = "👨‍🎓"; loading.textContent = "대기 중"; }
-        // if (state === 'listening') { character.textContent = "✍️"; loading.textContent = "듣고 있어요..."; }
-        // if (state === 'analyzing') { character.textContent = "🧠"; loading.textContent = "생각 중..."; }
-        // if (state === 'speaking') { character.textContent = "📢"; loading.textContent = "답변 중!"; }
-
         const charImage = document.getElementById('charImage');
         if (state === 'idle') {
             charImage.src = "/images/blob-idle.png";
             loading.textContent = "대기 중";
-        }
-        if (state === 'listening') {
+        } else if (state === 'listening') {
             charImage.src = "/images/blob-listening.gif";
             loading.textContent = "듣고 있어요...";
-        }
-        if (state === 'analyzing') {
+        } else if (state === 'analyzing') {
             charImage.src = "/images/blob-thinking.gif";
             loading.textContent = "생각 중...💭";
-        }
-        if (state === 'speaking') {
-            charImage.src = "/images/blob-speaking.gif"; // 말할 때는 움짤(GIF)도 가능!
+        } else if (state === 'speaking') {
+            charImage.src = "/images/blob-speaking.gif";
             loading.textContent = "답변 중!";
         }
     }
 
-    function stopAiAudio() {
-        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
-        audioQueue.length = 0;
-        isPlaying = false;
-        currentAiMsgDiv = null;
-        if (eventSource) { eventSource.close(); eventSource = null; initSseConnection(); }
-        updateUIState('idle');
-    }
-
     async function toggleRecording() {
-        stopAiAudio();
-        if (isAutoMode && isRecording) {
+        if (isAutoMode) {
+            // Manual termination
+            isAutoMode = false;
+            isWaitingForAi = false;
             if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-            isRecording = false;
-            return;
-        }
-        if (!isAutoMode) {
-            isAutoMode = true;
-            try {
-                globalStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-                startAudioAnalysis(globalStream);
-                startListeningChunk();
-            } catch (err) { alert("마이크 권한이 필요합니다."); isAutoMode = false; }
-        } else if (!isRecording) { startListeningChunk(); }
-    }
-
-    function startListeningChunk() {
-        if (!globalStream || !isAutoMode) return;
-        audioChunks = [];
-        mediaRecorder = new MediaRecorder(globalStream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = async () => {
+            if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; }
+            audioQueue.length = 0;
+            updateUIState('idle');
             micBtn.textContent = '🎤';
             micBtn.classList.remove('recording');
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            if (audioBlob.size > 3000 && isAutoMode) sendAudioToServer(audioBlob);
-            else if (isAutoMode) setTimeout(startListeningChunk, 300);
-        };
-        mediaRecorder.start();
-        isRecording = true;
-        micBtn.textContent = '⏹️';
-        micBtn.classList.add('recording');
-        updateUIState('listening');
+        } else {
+            // Start Tiki-Taka loop
+            isAutoMode = true;
+            micBtn.textContent = '⏹️';
+            micBtn.classList.add('recording');
+
+            if (!globalStream) {
+                try {
+                    globalStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    const source = audioContext.createMediaStreamSource(globalStream);
+                    source.connect(analyser);
+                    dataArray = new Float32Array(analyser.frequencyBinCount);
+                    monitorVAD();
+                } catch (e) {
+                    alert("마이크 권한이 필요합니다.");
+                    isAutoMode = false;
+                    return;
+                }
+            }
+            startContinuousListening();
+        }
     }
 
-    async function sendAudioToServer(audioBlob) {
+    function monitorVAD() {
+        requestAnimationFrame(monitorVAD);
+
+        if (!isAutoMode || isPlaying || isWaitingForAi || !isRecording) return;
+
+        analyser.getFloatTimeDomainData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
+        let rms = Math.sqrt(sum / dataArray.length);
+
+        if (rms > SPEECH_THRESHOLD) {
+            hasSpokenInChunk = true;
+            silenceStart = null;
+            totalSilenceStart = Date.now(); // Reset full silence timer
+            updateUIState('listening');
+        } else {
+            if (hasSpokenInChunk) {
+                // User spoke, but paused
+                if (!silenceStart) silenceStart = Date.now();
+                else if (Date.now() - silenceStart > CHUNK_SILENCE_MS) {
+                    // Stop current chunk to send, will auto-restart in onstop
+                    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+                }
+            } else {
+                // User has not spoken at all since mic turned on
+                if (!totalSilenceStart) totalSilenceStart = Date.now();
+                else if (Date.now() - totalSilenceStart > MAX_SILENCE_MS) {
+                    triggerForceAiResponse();
+                }
+            }
+        }
+    }
+
+    function startContinuousListening() {
+        if (!isAutoMode || isPlaying || isWaitingForAi) return;
+
+        audioChunks = [];
+        hasSpokenInChunk = false;
+        silenceStart = null;
+        totalSilenceStart = Date.now();
+
+        mediaRecorder = new MediaRecorder(globalStream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            isRecording = false;
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+
+            // Send chunk if user spoke
+            if (hasSpokenInChunk && blob.size > 1000) {
+                sendChunkToServer(blob);
+            }
+
+            // Immediately restart recording if we are not interrupted by AI
+            if (isAutoMode && !isWaitingForAi && !isPlaying) {
+                startContinuousListening();
+            }
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        updateUIState('listening'); // Keep listening state visually
+    }
+
+    async function sendChunkToServer(blob) {
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'voice.webm');
+        formData.append('audio', blob, 'voice.webm');
 
         try {
             const response = await fetch(`/api/v1/learning/audio?sessionId=${sessionId}`, {
-                method: 'POST',
-                body: formData
+                method: 'POST', body: formData
             });
-
             if (response.ok) {
-                const transcript = await response.text();
-                if (transcript.trim() !== "") {
-                    appendMessage("🎤 " + transcript, 'user-msg');
-                    // 💡 여기서 AI의 SSE 응답을 기다리게 됩니다.
-                } else {
-                    // 💡 들려온 소리가 없거나 너무 작아서 무시된 경우 -> 즉시 다시 듣기
-                    forceResumeMic();
+                const text = await response.text();
+                if (text.trim() !== "") {
+                    appendMessage("🎤 " + text, 'user-msg');
                 }
-            } else {
-                forceResumeMic();
             }
         } catch (error) {
-            console.error("음성 전송 실패", error);
-            resumeListening();
+            console.error("Chunk send failed", error);
         }
     }
 
-    // 💡 공통으로 사용할 리스닝 재개 함수
-    function resumeListening() {
-        updateUIState('idle');
-        if (isAutoMode && !isRecording && !isPlaying) {
-            setTimeout(startListeningChunk, 300);
+    function triggerForceAiResponse() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop(); // This drops the empty chunk
         }
-    }
 
-    function startAudioAnalysis(stream) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        const microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Float32Array(bufferLength);
-
-        function checkAudioLevel() {
-            if (!isAutoMode) return;
-            analyser.getFloatTimeDomainData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < bufferLength; i++) sum += dataArray[i] * dataArray[i];
-            const rms = Math.sqrt(sum / bufferLength);
-
-            if (rms > SPEECH_THRESHOLD && isPlaying) { stopAiAudio(); if (!isRecording) startListeningChunk(); }
-            if (rms < SILENCE_THRESHOLD) {
-                if (!silenceStart) silenceStart = Date.now();
-                else if (Date.now() - silenceStart > SILENCE_DURATION && isRecording) {
-                    mediaRecorder.stop(); isRecording = false; silenceStart = null;
-                }
-            } else { silenceStart = null; }
-            requestAnimationFrame(checkAudioLevel);
-        }
-        checkAudioLevel();
-    }
-
-    function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
-
-    async function sendMessage() {
-        const text = inputField.value.trim();
-        if (!text) return;
-        stopAiAudio();
-        appendMessage(text, 'user-msg');
-        inputField.value = '';
+        isWaitingForAi = true;
         updateUIState('analyzing');
-        try {
-            await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
-                method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text
-            });
-        } catch (error) { updateUIState('idle'); }
+        appendMessage("...", 'user-msg');
+
+        fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: "(System Notice: The user is silent. Ask a brief question to prompt them to explain the concept.)"
+        }).catch(() => {
+            isWaitingForAi = false;
+            if (isAutoMode) startContinuousListening();
+        });
     }
 
+    // SSE Connection Initialization
     function initSseConnection() {
         if (eventSource) eventSource.close();
         eventSource = new EventSource(`/api/v1/learning/subscribe?sessionId=${sessionId}`);
 
         eventSource.addEventListener('message', (event) => {
+            // Force stop any ongoing recording when AI starts replying
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                hasSpokenInChunk = false;
+                mediaRecorder.stop();
+            }
+
+            isWaitingForAi = true;
             const data = JSON.parse(event.data);
             renderStreamingText(data.text);
-            if (data.audio) { audioQueue.push("data:audio/mp3;base64," + data.audio); playNextInQueue(); }
-        });
 
-        eventSource.addEventListener('done', () => {
-            console.log("AI 응답 생성 완료");
-            // 만약 재생할 오디오가 아예 없었다면(텍스트만 왔다면), 여기서 바로 마이크를 켭니다.
-            setTimeout(() => {
-                if (isAutoMode && !isRecording && !isPlaying) {
-                    startListeningChunk();
-                }
-            }, 500);
-        });
-
-        eventSource.addEventListener('done', () => {
-            console.log("AI 답변 프로세스 종료");
-            // 오디오 재생 중이 아니라면 바로 마이크를 켭니다.
-            if (!isPlaying) {
-                forceResumeMic();
+            if (data.audio) {
+                audioQueue.push("data:audio/mp3;base64," + data.audio);
+                playNextInQueue();
             }
+        });
+
+        eventSource.addEventListener('done', () => {
+            // Do not start mic here; wait for audio playback to finish completely
         });
     }
     initSseConnection();
-
-
-    // 💡 마이크를 안전하게 다시 켜는 통합 함수
-    function forceResumeMic() {
-        updateUIState('idle');
-        if (isAutoMode && !isRecording && !isPlaying) {
-            setTimeout(() => {
-                if (!isRecording) startListeningChunk();
-            }, 500);
-        }
-    }
-
-    // 💡 샌드 메시지나 음성 전송 시 'analyzing' 상태가 너무 길어지면 강제 복구
-    function startSafetyTimeout() {
-        setTimeout(() => {
-            if (loading.textContent.includes("생각 중") || loading.textContent.includes("정리 중")) {
-                console.warn("응답 지연으로 인한 마이크 강제 복구");
-                forceResumeMic();
-            }
-        }, 8000); // 8초 이상 응답 없으면 강제 복구
-    }
-
 
     function renderStreamingText(text) {
         if (!currentAiMsgDiv) {
@@ -623,12 +612,22 @@
         isPlaying = true;
         currentAudio = new Audio(audioQueue.shift());
         currentAudio.play();
+
         currentAudio.onended = () => {
             isPlaying = false;
-            if (audioQueue.length > 0) playNextInQueue();
-            else {
-                updateUIState('idle'); currentAudio = null; currentAiMsgDiv = null;
-                setTimeout(() => { if (!isRecording && isAutoMode) startListeningChunk(); }, 300);
+            if (audioQueue.length > 0) {
+                playNextInQueue();
+            } else {
+                // Audio queue is completely finished. Turn mic back on!
+                isWaitingForAi = false;
+                currentAudio = null;
+                currentAiMsgDiv = null;
+
+                if (isAutoMode) {
+                    startContinuousListening();
+                } else {
+                    updateUIState('idle');
+                }
             }
         };
     }
@@ -641,22 +640,49 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+
+    async function sendMessage() {
+        const text = inputField.value.trim();
+        if (!text) return;
+
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; }
+        audioQueue.length = 0;
+
+        appendMessage(text, 'user-msg');
+        inputField.value = '';
+        isWaitingForAi = true;
+        updateUIState('analyzing');
+
+        try {
+            await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
+                method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text
+            });
+        } catch (error) {
+            isWaitingForAi = false;
+            if (isAutoMode) startContinuousListening();
+        }
+    }
+
     async function endConversation() {
         const topic = prompt("오늘 복습한 핵심 키워드가 뭐야?", "자유 주제");
         if (!topic) return;
         document.getElementById('chat-section').style.display = 'none';
         document.getElementById('summary-section').style.display = 'flex';
         document.querySelector('.end-btn').style.display = 'none';
-        isAutoMode = false;
-        if (globalStream) globalStream.getTracks().forEach(t => t.stop());
-        try {
-            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, { method: 'POST' });
-            const summary = await response.text();
-            document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 주제 요약이 저장되었습니다!`;
-        } catch (error) { document.getElementById('summaryContent').innerHTML = "요약 저장에 실패했습니다."; }
-    }
 
-    function goToDashboard() { window.location.href = `/dashboard.html`; }
+        isAutoMode = false;
+        isWaitingForAi = false;
+        if (globalStream) globalStream.getTracks().forEach(t => t.stop());
+
+        try {
+            await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, { method: 'POST' });
+            document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 주제 요약이 저장되었습니다!`;
+        } catch (error) {
+            document.getElementById('summaryContent').innerHTML = "요약 저장에 실패했습니다.";
+        }
+    }
 </script>
 </body>
 </html>
