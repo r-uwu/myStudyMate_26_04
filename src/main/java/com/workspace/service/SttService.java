@@ -64,8 +64,8 @@ public class SttService {
 
                         log.info("STT 분석 결과 - Text: {}, NoSpeechProb: {}, AvgLogprob: {}", transcript, noSpeechProb, avgLogprob);
 
-                        // 1. 무음 확률이 높거나 확신도가 지나치게 낮은 경우 차단
-                        if (noSpeechProb > 0.6 || avgLogprob < -1.0) {
+                        // 텍스트가 명확히 존재하고 신뢰도(Logprob)가 높다면, 무음 확률(NoSpeechProb) 임계치를 0.90까지 방어적으로 상향
+                        if (noSpeechProb > 0.90 && avgLogprob < -1.0) {
                             log.warn("⚠️ Whisper 환각 감지 및 차단 (NoSpeech: {}, Logprob: {})", noSpeechProb, avgLogprob);
                             return null;
                         }
