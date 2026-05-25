@@ -55,7 +55,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2.5rem;
+            margin-bottom: 1.5rem;
             padding-bottom: 1.5rem;
             border-bottom: 2px solid var(--border-color);
         }
@@ -81,7 +81,53 @@
         .nav-links a.home-btn { background-color: var(--accent-yellow); color: var(--accent-brown); border-color: var(--accent-yellow); }
         .nav-links a.home-btn:hover { filter: brightness(0.95); }
 
-        /* 세련된 그리드 & 카드 디자인 */
+        /* 검색 툴바 디자인 */
+        .toolbar {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0.8rem 1.5rem;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            box-shadow: var(--shadow-soft);
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* 날짜별 타임라인 구분선 */
+        .timeline-group {
+            margin-bottom: 3rem;
+        }
+
+        .timeline-date {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-date::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: var(--border-color);
+        }
+
+        /* 그리드 & 카드 디자인 */
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
@@ -98,8 +144,8 @@
             padding: 1.8rem;
             box-shadow: var(--shadow-soft);
             border: 1px solid var(--border-color);
-            border-top: 5px solid var(--primary-color); /* 상단 포인트 라인 */
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+            border-top: 5px solid var(--primary-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
             display: flex;
             flex-direction: column;
         }
@@ -128,13 +174,10 @@
             gap: 6px;
         }
 
-        .date-text {
+        .time-text {
             font-size: 0.85rem;
             color: var(--text-muted);
             font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 4px;
         }
 
         .card-body {
@@ -149,7 +192,6 @@
         }
 
         .empty-state {
-            grid-column: 1 / -1;
             text-align: center;
             padding: 5rem 0;
             color: var(--text-muted);
@@ -172,7 +214,11 @@
         </div>
     </header>
 
-    <div class="summary-grid" id="summaryContainer">
+    <div class="toolbar">
+        <input type="text" id="searchInput" class="search-input" placeholder="주제나 요약 내용을 검색해보세요..." onkeyup="filterData()">
+    </div>
+
+    <div id="mainContainer">
         <div class="empty-state" id="loadingState">
             데이터를 불러오는 중입니다... 🏃‍♂️
         </div>
@@ -180,59 +226,40 @@
 </div>
 
 <script>
+    let allHistoryData = []; // DB에서 가져온 원본 데이터 저장
+
     document.addEventListener('DOMContentLoaded', () => {
-        let sessionId = localStorage.getItem('msm_session_id');
-        if (!sessionId) sessionId = 'session_default';
+        let sessionId = localStorage.getItem('msm_session_id') || 'session_default';
         loadHistoryData(sessionId);
     });
 
+    // 1. 실제 DB에서 데이터 Fetch
     async function loadHistoryData(sessionId) {
-        const container = document.getElementById('summaryContainer');
+        const container = document.getElementById('mainContainer');
 
         try {
             const response = await fetch(`/api/v1/learning/history?sessionId=${sessionId}`);
 
             if (response.ok) {
-                const historyList = await response.json();
+                const rawData = await response.json();
 
-                if (historyList.length === 0) {
-                    container.innerHTML = `<div class="empty-state">아직 완료된 학습 세션이 없습니다.<br>채팅을 통해 첫 복습을 시작해보세요! 🚀</div>`;
-                    return;
-                }
-
-                container.innerHTML = '';
-
-                historyList.forEach(item => {
-                    const card = document.createElement('div');
-                    card.className = 'summary-card';
-
-                    // 💡 날짜 파싱 안정화 로직 (배열 & 문자열 모두 처리)
+                // 데이터를 날짜 파싱하기 쉽게 전처리
+                allHistoryData = rawData.map(item => {
                     let dateObj;
                     if (Array.isArray(item.createdAt)) {
-                        // Jackson의 LocalDateTime 배열 형식: [연, 월, 일, 시, 분, 초]
-                        // JS의 month는 0부터 시작하므로 -1 처리
-                        dateObj = new Date(item.createdAt[0], item.createdAt[1] - 1, item.createdAt[2]);
+                        dateObj = new Date(item.createdAt[0], item.createdAt[1] - 1, item.createdAt[2], item.createdAt[3] || 0, item.createdAt[4] || 0);
                     } else if (item.createdAt) {
                         dateObj = new Date(item.createdAt);
                     } else {
                         dateObj = new Date();
                     }
-
-                    // 날짜 유효성 검증
-                    let formattedDate = "날짜 정보 없음";
-                    if (!isNaN(dateObj.getTime())) {
-                        formattedDate = `${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일`;
-                    }
-
-                    card.innerHTML = `
-                        <div class="card-header">
-                            <span class="topic-badge">📌 ${escapeHtml(item.topic || '자유 주제')}</span>
-                            <span class="date-text">🕒 ${formattedDate}</span>
-                        </div>
-                        <div class="card-body">${formatSummaryText(item.summary)}</div>
-                    `;
-                    container.appendChild(card);
+                    return { ...item, parsedDate: dateObj };
                 });
+
+                // 최신순 정렬
+                allHistoryData.sort((a, b) => b.parsedDate - a.parsedDate);
+
+                renderTimeline(allHistoryData);
             } else {
                 throw new Error("API Response Error");
             }
@@ -241,6 +268,85 @@
         }
     }
 
+    // 2. 검색 필터링 로직 (프론트엔드 단독 처리)
+    function filterData() {
+        const keyword = document.getElementById('searchInput').value.toLowerCase();
+
+        if (!keyword) {
+            renderTimeline(allHistoryData);
+            return;
+        }
+
+        const filteredData = allHistoryData.filter(item => {
+            const topicMatch = item.topic && item.topic.toLowerCase().includes(keyword);
+            const summaryMatch = item.summary && item.summary.toLowerCase().includes(keyword);
+            return topicMatch || summaryMatch;
+        });
+
+        renderTimeline(filteredData);
+    }
+
+    // 3. 날짜별 그룹화 및 화면 렌더링 (메신저 스타일)
+    function renderTimeline(dataList) {
+        const container = document.getElementById('mainContainer');
+        container.innerHTML = '';
+
+        if (dataList.length === 0) {
+            container.innerHTML = `<div class="empty-state">조건에 맞는 학습 세션이 없습니다. 🚀</div>`;
+            return;
+        }
+
+        // 데이터를 날짜 문자열(예: "2026년 5월 25일") 기준으로 그룹화
+        const groupedData = dataList.reduce((acc, item) => {
+            const dateStr = !isNaN(item.parsedDate.getTime())
+                ? `${item.parsedDate.getFullYear()}년 ${item.parsedDate.getMonth() + 1}월 ${item.parsedDate.getDate()}일`
+                : "날짜 정보 없음";
+
+            if (!acc[dateStr]) acc[dateStr] = [];
+            acc[dateStr].push(item);
+            return acc;
+        }, {});
+
+        // 그룹화된 데이터를 기반으로 HTML 생성
+        for (const [dateString, items] of Object.entries(groupedData)) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'timeline-group';
+
+            // 날짜 헤더 생성
+            const dateHeader = document.createElement('div');
+            dateHeader.className = 'timeline-date';
+            dateHeader.textContent = dateString;
+            groupDiv.appendChild(dateHeader);
+
+            // 해당 날짜의 카드 그리드 생성
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'summary-grid';
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'summary-card';
+
+                // 시간만 포맷팅 (예: "14:30")
+                const timeStr = !isNaN(item.parsedDate.getTime())
+                    ? `${String(item.parsedDate.getHours()).padStart(2, '0')}:${String(item.parsedDate.getMinutes()).padStart(2, '0')}`
+                    : "";
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <span class="topic-badge">📌 ${escapeHtml(item.topic || '자유 주제')}</span>
+                        <span class="time-text">🕒 ${timeStr}</span>
+                    </div>
+                    <div class="card-body">${formatSummaryText(item.summary)}</div>
+                `;
+                gridDiv.appendChild(card);
+            });
+
+            groupDiv.appendChild(gridDiv);
+            container.appendChild(groupDiv);
+        }
+    }
+
+    // 유틸리티 함수
     function escapeHtml(unsafe) {
         return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
