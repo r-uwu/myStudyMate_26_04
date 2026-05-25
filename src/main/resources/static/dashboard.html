@@ -164,6 +164,16 @@
             font-weight: 700;
             color: var(--text-main);
         }
+
+        .home-btn {
+            background-color: var(--accent-color, #f6de90) !important;
+            color: #856341 !important;
+            border-color: #f6de90 !important;
+            font-weight: 700 !important;
+        }
+        .home-btn:hover {
+            filter: brightness(0.95);
+        }
     </style>
 </head>
 <body>
@@ -172,6 +182,7 @@
     <header>
         <h1>학습 통계 대시보드</h1>
         <div class="nav-links">
+            <a href="/index.html" class="home-btn">💬 대화하기</a>
             <a href="/summary.html">학습 요약표</a>
             <a href="/dashboard.html" class="active">통계 대시보드</a>
         </div>
@@ -222,104 +233,157 @@
 </div>
 
 <script>
-    // Set common chart options for responsive design and dark mode adaptation
     const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
     const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim();
 
     Chart.defaults.color = textColor;
     Chart.defaults.font.family = "'Pretendard', sans-serif";
 
-    // 1. Weekly Trend Chart (Area Line Chart)
-    const ctxTrend = document.getElementById('trendChart').getContext('2d');
-    new Chart(ctxTrend, {
-        type: 'line',
-        data: {
-            labels: ['월', '화', '수', '목', '금', '토', '일'],
-            datasets: [{
-                label: '학습 시간 (시간)',
-                data: [1.5, 2.0, 1.0, 3.5, 2.0, 4.0, 0.5],
-                borderColor: 'rgb(110, 142, 181)',
-                backgroundColor: 'rgba(110, 142, 181, 0.2)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: gridColor }
-                },
-                x: {
-                    grid: { display: false }
-                }
+    let trendChartInstance = null;
+    let subjectChartInstance = null;
+    let activityChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        let sessionId = localStorage.getItem('msm_session_id');
+        if (!sessionId) {
+            console.warn("Session ID not found. Using default.");
+            sessionId = 'session_default';
+        }
+        loadDashboardData(sessionId);
+    });
+
+    async function loadDashboardData(sessionId) {
+        try {
+            const [subjectRes, weeklyRes] = await Promise.all([
+                fetch(`/api/v1/learning/stats/subjects?sessionId=${sessionId}`),
+                fetch(`/api/v1/learning/stats/weekly?sessionId=${sessionId}`)
+            ]);
+
+            if (subjectRes.ok && weeklyRes.ok) {
+                const subjectData = await subjectRes.json();
+                const weeklyData = await weeklyRes.json();
+
+                renderKPIs(weeklyData);
+                renderSubjectChart(subjectData);
+                renderActivityChart(weeklyData);
+
+                // 일별 통계 API가 구현되기 전까지 빈 차트 렌더링
+                renderTrendChartPlaceholder();
+            } else {
+                console.error("API response error");
+            }
+        } catch (error) {
+            console.error("Failed to load dashboard data.", error);
+        }
+    }
+
+    function renderKPIs(weeklyData) {
+        let totalSessions = 0;
+
+        // WeeklyStatResponse DTO의 summaryCount 필드 합산
+        weeklyData.forEach(week => {
+            totalSessions += (week.summaryCount || 0);
+        });
+
+        // studyHours 데이터가 없으므로 임시 숨김 혹은 대체 텍스트 처리
+        document.getElementById('totalHours').textContent = '측정 불가';
+        document.getElementById('completedSessions').textContent = totalSessions + '건';
+        document.getElementById('streakDays').textContent = '- 일';
+    }
+
+    function renderSubjectChart(subjectData) {
+        // SubjectStatResponse DTO 필드 매핑
+        const labels = subjectData.map(d => d.subjectName || '기타');
+        const dataPoints = subjectData.map(d => d.studyCount || 0);
+
+        const ctxSubject = document.getElementById('subjectChart').getContext('2d');
+        if (subjectChartInstance) subjectChartInstance.destroy();
+
+        subjectChartInstance = new Chart(ctxSubject, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: dataPoints,
+                    backgroundColor: [
+                        'rgb(110, 142, 181)', 'rgb(161, 179, 198)',
+                        'rgb(94, 234, 212)', 'rgb(203, 213, 225)', 'rgb(148, 163, 184)'
+                    ],
+                    borderWidth: 0
+                }]
             },
-            plugins: {
-                legend: { display: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: { legend: { position: 'bottom', labels: { padding: 20 } } }
             }
-        }
-    });
+        });
+    }
 
-    // 2. Subject Distribution Chart (Doughnut Chart)
-    const ctxSubject = document.getElementById('subjectChart').getContext('2d');
-    new Chart(ctxSubject, {
-        type: 'doughnut',
-        data: {
-            labels: ['Spring Boot', 'JavaScript', 'Database', 'CS Foundation'],
-            datasets: [{
-                data: [45, 25, 20, 10],
-                backgroundColor: [
-                    'rgb(110, 142, 181)',
-                    'rgb(161, 179, 198)',
-                    'rgb(94, 234, 212)',
-                    'rgb(203, 213, 225)'
-                ],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '70%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { padding: 20 }
+    function renderActivityChart(weeklyData) {
+        // WeeklyStatResponse DTO 필드 매핑
+        const labels = weeklyData.map(d => d.weekLabel || '미상');
+        const dataPoints = weeklyData.map(d => d.summaryCount || 0);
+
+        const ctxActivity = document.getElementById('activityChart').getContext('2d');
+        if (activityChartInstance) activityChartInstance.destroy();
+
+        activityChartInstance = new Chart(ctxActivity, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '생성된 요약본 수',
+                    data: dataPoints,
+                    backgroundColor: 'rgb(110, 142, 181)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { stepSize: 1 }
+                    },
+                    x: { grid: { display: false } }
                 }
             }
-        }
-    });
+        });
+    }
 
-    // 3. Monthly Activity Chart (Bar Chart)
-    const ctxActivity = document.getElementById('activityChart').getContext('2d');
-    new Chart(ctxActivity, {
-        type: 'bar',
-        data: {
-            labels: ['1주차', '2주차', '3주차', '4주차'],
-            datasets: [{
-                label: '생성된 요약본 수',
-                data: [12, 19, 15, 22],
-                backgroundColor: 'rgb(110, 142, 181)',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: gridColor }
+    function renderTrendChartPlaceholder() {
+        const ctxTrend = document.getElementById('trendChart').getContext('2d');
+        if (trendChartInstance) trendChartInstance.destroy();
+
+        trendChartInstance = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: ['월', '화', '수', '목', '금', '토', '일'],
+                datasets: [{
+                    label: '학습 시간 (시간)',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    borderColor: 'rgb(203, 213, 225)',
+                    backgroundColor: 'rgba(203, 213, 225, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: gridColor }, max: 5 },
+                    x: { grid: { display: false } }
                 },
-                x: {
-                    grid: { display: false }
-                }
+                plugins: { legend: { display: false } }
             }
-        }
-    });
+        });
+    }
 </script>
 </body>
 </html>

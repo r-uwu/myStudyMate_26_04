@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mystudymate 학습 요약표</title>
+    <style>
+        :root {
+            --primary-color: #6e8eb5;
+            --primary-light: #eff4fa;
+            --secondary-color: #a1b3c6;
+            --accent-yellow: #f6de90;
+            --accent-brown: #856341;
+            --bg-color: #f4f7fa;
+            --card-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --shadow-soft: 0 10px 25px rgba(110, 142, 181, 0.08);
+            --shadow-hover: 0 15px 35px rgba(110, 142, 181, 0.15);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --card-bg: #1e293b;
+                --text-main: #f1f5f9;
+                --text-muted: #94a3b8;
+                --border-color: #334155;
+                --primary-light: rgba(110, 142, 181, 0.15);
+                --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.3);
+                --shadow-hover: 0 15px 35px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 1100px;
+            padding: 3rem 1.5rem;
+            box-sizing: border-box;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--primary-color); letter-spacing: -0.02em; }
+
+        .nav-links a {
+            padding: 0.6rem 1.25rem;
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-left: 0.5rem;
+        }
+
+        .nav-links a:hover { background-color: var(--bg-color); border-color: var(--secondary-color); }
+        .nav-links a.active { background-color: var(--primary-color); color: #ffffff; border-color: var(--primary-color); }
+        .nav-links a.home-btn { background-color: var(--accent-yellow); color: var(--accent-brown); border-color: var(--accent-yellow); }
+        .nav-links a.home-btn:hover { filter: brightness(0.95); }
+
+        /* 검색 툴바 디자인 */
+        .toolbar {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0.8rem 1.5rem;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            box-shadow: var(--shadow-soft);
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* 날짜별 타임라인 구분선 */
+        .timeline-group {
+            margin-bottom: 3rem;
+        }
+
+        .timeline-date {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-date::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: var(--border-color);
+        }
+
+        /* 그리드 & 카드 디자인 */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+
+        .summary-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.8rem;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid var(--border-color);
+            border-top: 5px solid var(--primary-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem;
+        }
+
+        .topic-badge {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .time-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .card-body {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            line-height: 1.8;
+            background: var(--bg-color);
+            padding: 1.2rem;
+            border-radius: 12px;
+            flex-grow: 1;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 5rem 0;
+            color: var(--text-muted);
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            border: 2px dashed var(--border-color);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <header>
+        <h1>나의 학습 요약표</h1>
+        <div class="nav-links">
+            <a href="/index.html" class="home-btn">💬 대화하기</a>
+            <a href="/summary.html" class="active">학습 요약표</a>
+            <a href="/dashboard.html">통계 대시보드</a>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <input type="text" id="searchInput" class="search-input" placeholder="주제나 요약 내용을 검색해보세요..." onkeyup="filterData()">
+    </div>
+
+    <div id="mainContainer">
+        <div class="empty-state" id="loadingState">
+            데이터를 불러오는 중입니다... 🏃‍♂️
+        </div>
+    </div>
+</div>
+
+<script>
+    let allHistoryData = []; // DB에서 가져온 원본 데이터 저장
+
+    document.addEventListener('DOMContentLoaded', () => {
+        let sessionId = localStorage.getItem('msm_session_id') || 'session_default';
+        loadHistoryData(sessionId);
+    });
+
+    // 1. 실제 DB에서 데이터 Fetch
+    async function loadHistoryData(sessionId) {
+        const container = document.getElementById('mainContainer');
+
+        try {
+            const response = await fetch(`/api/v1/learning/history?sessionId=${sessionId}`);
+
+            if (response.ok) {
+                const rawData = await response.json();
+
+                // 데이터를 날짜 파싱하기 쉽게 전처리
+                allHistoryData = rawData.map(item => {
+                    let dateObj;
+                    if (Array.isArray(item.createdAt)) {
+                        dateObj = new Date(item.createdAt[0], item.createdAt[1] - 1, item.createdAt[2], item.createdAt[3] || 0, item.createdAt[4] || 0);
+                    } else if (item.createdAt) {
+                        dateObj = new Date(item.createdAt);
+                    } else {
+                        dateObj = new Date();
+                    }
+                    return { ...item, parsedDate: dateObj };
+                });
+
+                // 최신순 정렬
+                allHistoryData.sort((a, b) => b.parsedDate - a.parsedDate);
+
+                renderTimeline(allHistoryData);
+            } else {
+                throw new Error("API Response Error");
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="empty-state">데이터를 불러오는데 실패했습니다. 서버 상태를 확인해주세요. 💦</div>`;
+        }
+    }
+
+    // 2. 검색 필터링 로직 (프론트엔드 단독 처리)
+    function filterData() {
+        const keyword = document.getElementById('searchInput').value.toLowerCase();
+
+        if (!keyword) {
+            renderTimeline(allHistoryData);
+            return;
+        }
+
+        const filteredData = allHistoryData.filter(item => {
+            const topicMatch = item.topic && item.topic.toLowerCase().includes(keyword);
+            const summaryMatch = item.summary && item.summary.toLowerCase().includes(keyword);
+            return topicMatch || summaryMatch;
+        });
+
+        renderTimeline(filteredData);
+    }
+
+    // 3. 날짜별 그룹화 및 화면 렌더링 (메신저 스타일)
+    function renderTimeline(dataList) {
+        const container = document.getElementById('mainContainer');
+        container.innerHTML = '';
+
+        if (dataList.length === 0) {
+            container.innerHTML = `<div class="empty-state">조건에 맞는 학습 세션이 없습니다. 🚀</div>`;
+            return;
+        }
+
+        // 데이터를 날짜 문자열(예: "2026년 5월 25일") 기준으로 그룹화
+        const groupedData = dataList.reduce((acc, item) => {
+            const dateStr = !isNaN(item.parsedDate.getTime())
+                ? `${item.parsedDate.getFullYear()}년 ${item.parsedDate.getMonth() + 1}월 ${item.parsedDate.getDate()}일`
+                : "날짜 정보 없음";
+
+            if (!acc[dateStr]) acc[dateStr] = [];
+            acc[dateStr].push(item);
+            return acc;
+        }, {});
+
+        // 그룹화된 데이터를 기반으로 HTML 생성
+        for (const [dateString, items] of Object.entries(groupedData)) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'timeline-group';
+
+            // 날짜 헤더 생성
+            const dateHeader = document.createElement('div');
+            dateHeader.className = 'timeline-date';
+            dateHeader.textContent = dateString;
+            groupDiv.appendChild(dateHeader);
+
+            // 해당 날짜의 카드 그리드 생성
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'summary-grid';
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'summary-card';
+
+                // 시간만 포맷팅 (예: "14:30")
+                const timeStr = !isNaN(item.parsedDate.getTime())
+                    ? `${String(item.parsedDate.getHours()).padStart(2, '0')}:${String(item.parsedDate.getMinutes()).padStart(2, '0')}`
+                    : "";
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <span class="topic-badge">📌 ${escapeHtml(item.topic || '자유 주제')}</span>
+                        <span class="time-text">🕒 ${timeStr}</span>
+                    </div>
+                    <div class="card-body">${formatSummaryText(item.summary)}</div>
+                `;
+                gridDiv.appendChild(card);
+            });
+
+            groupDiv.appendChild(gridDiv);
+            container.appendChild(groupDiv);
+        }
+    }
+
+    // 유틸리티 함수
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function formatSummaryText(text) {
+        if (!text) return "요약 내용이 없습니다.";
+        return escapeHtml(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
+</script>
+</body>
+</html>
