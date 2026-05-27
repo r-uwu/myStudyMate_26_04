@@ -453,7 +453,9 @@
 
     function initSseConnection() {
         if (eventSource) eventSource.close();
-        eventSource = new EventSource(`/api/v1/learning/subscribe?sessionId=${sessionId}`);
+        // EventSource는 헤더를 지원하지 않으므로 URL 파라미터로 토큰을 안전하게 전달
+        const jwtToken = localStorage.getItem('jwt_token');
+        eventSource = new EventSource(`/api/v1/learning/subscribe?token=${jwtToken}`);
 
         eventSource.addEventListener('message', (event) => {
             if (mediaRecorder && mediaRecorder.state === 'recording') {
