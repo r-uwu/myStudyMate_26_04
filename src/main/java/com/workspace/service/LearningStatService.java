@@ -16,11 +16,11 @@ public class LearningStatService {
 
     private final LearningStatMapper statMapper;
 
-    public List<SubjectStatResponse> getSubjectStats(String sessionId) {
-        return statMapper.selectSubjectStats(sessionId);
+    public List<SubjectStatResponse> getSubjectStats(String userEmail) {
+        return statMapper.selectSubjectStats(userEmail);
     }
 
-    public List<WeeklyStatResponse> getWeeklyStats(String sessionId) {
-        return statMapper.selectWeeklyStats(sessionId);
+    public List<WeeklyStatResponse> getWeeklyStats(String userEmail) {
+        return statMapper.selectWeeklyStats(userEmail);
     }
 }

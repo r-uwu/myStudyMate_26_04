@@ -9,6 +9,6 @@ import java.util.List;
 
 @Mapper
 public interface LearningStatMapper {
-    List<SubjectStatResponse> selectSubjectStats(@Param("sessionId") String sessionId);
-    List<WeeklyStatResponse> selectWeeklyStats(@Param("sessionId") String sessionId);
+    List<SubjectStatResponse> selectSubjectStats(@Param("userEmail") String userEmail);
+    List<WeeklyStatResponse> selectWeeklyStats(@Param("userEmail") String userEmail);
 }

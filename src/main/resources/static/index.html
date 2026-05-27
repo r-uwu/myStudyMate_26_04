@@ -3,333 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>나의 스터디 메이트 | 복습 지킴이</title>
+    <title>대화하기 | 나의 스터디 메이트</title>
+    <script>
+        if (!localStorage.getItem('jwt_token')) window.location.href = '/login.html';
+    </script>
     <style>
         :root {
-            --primary: rgb(161, 179, 198);
-            --primary-send: rgb(110, 142, 181);
-            --primary-dark: #50739e;
-            --primary-pulse: rgba(110, 142, 181, 0.4);
-            --bg-gray: #f1f5f9;
-            --border: #e2e8f0;
-            --ai-bubble: #ffffff;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-            --shadow-md: 0 10px 25px rgba(0,0,0,0.05);
-            --shadow-sidebar: -10px 0 30px rgba(0,0,0,0.1);
+            --bg-main: #f8fafc; --bg-card: #ffffff;
+            --text-main: #0f172a; --text-muted: #64748b;
+            --border: #e2e8f0; --primary: #3b82f6; --primary-hover: #2563eb;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        /* Viewport overflow explicitly hidden */
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 
-        body {
-            font-family: 'Pretendard', -apple-system, sans-serif;
-            background-color: #f1f5f9;
-            margin: 0; padding: 0;
-            display: flex; justify-content: center; align-items: center;
-            height: 100dvh;
-        }
+        /* min-height: 0 forces flex item to respect parent bounds */
+        .chat-container { flex: 1; min-height: 0; max-width: 800px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg-card); border-left: 1px solid var(--border); border-right: 1px solid var(--border); position: relative; }
 
-        .app-container {
-            width: 100%; max-width: 500px; height: 100dvh;
-            background: var(--bg-gray);
-            display: flex; flex-direction: column;
-            position: relative; overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.12);
-        }
+        .status-bar { flex-shrink: 0; padding: 12px; text-align: center; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .char-avatar { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
+        .char-avatar img { width: 100%; height: 100%; object-fit: contain; }
+        .loading-text { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
 
-        @media (min-width: 768px) {
-            .app-container { height: 90vh; border-radius: 24px; }
-        }
+        /* min-height: 0 ensures scrolling activates instead of expanding */
+        .chat-box { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+        .message { max-width: 85%; padding: 12px 16px; border-radius: 12px; line-height: 1.5; font-size: 0.95rem; }
+        .ai-msg { align-self: flex-start; background: var(--bg-main); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        .user-msg { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
 
-        /* 헤더 디자인 간소화 */
-        .header {
-            padding: 16px 20px;
-            background: white;
-            border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-            z-index: 10;
-        }
+        /* flex-shrink: 0 prevents buttons from being pushed out of view */
+        .bottom-area { flex-shrink: 0; padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg-card); display: flex; flex-direction: column; gap: 12px; }
+        .input-wrapper { display: flex; gap: 10px; align-items: center; background: var(--bg-main); padding: 6px 6px 6px 16px; border-radius: 30px; border: 1px solid var(--border); }
+        .input-wrapper input { flex: 1; border: none; background: transparent; outline: none; font-size: 1rem; }
 
-        .header-title { font-weight: 800; font-size: 1.1rem; color: var(--primary-send); letter-spacing: -0.02em; }
+        .mic-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: transparent; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .mic-btn.recording { background: #ef4444; color: white; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 
-        /* 햄버거 메뉴 버튼 */
-        .menu-btn {
-            background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--primary-send);
-            padding: 4px; display: flex; align-items: center; justify-content: center; transition: transform 0.2s;
-        }
-        .menu-btn:hover { transform: scale(1.1); }
+        .send-btn { background: var(--primary); color: white; border: none; padding: 0 16px; height: 36px; border-radius: 18px; font-weight: 600; cursor: pointer; }
+        .end-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #fef2f2; color: #ef4444; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .end-btn:hover { background: #fee2e2; }
 
-        .status-bar {
-            background: white; padding: 12px; text-align: center; border-bottom: 1px solid var(--border);
-        }
+        .settings-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+        .settings-modal { background: var(--bg-card); padding: 24px; border-radius: 12px; width: 90%; max-width: 320px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 20px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.1rem; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        .control-label { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+        .settings-modal input[type="range"] { width: 100%; accent-color: var(--primary); }
 
-        .character-box {
-            font-size: 2.8rem; margin-bottom: 4px;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: inline-block;
-        }
-
-        .state-speaking { transform: scale(1.1) rotate(3deg); }
-        .state-listening { animation: bounce 1.2s infinite ease-in-out; }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-6px); }
-        }
-
-        .loading-text { font-size: 0.8rem; color: #94a3b8; font-weight: 500; height: 1.2rem; }
-
-        /* 세련된 우측 슬라이드 사이드바 */
-        .sidebar {
-            position: absolute; top: 0; right: -280px; width: 280px; height: 100%;
-            background: white; z-index: 100; padding: 30px 24px;
-            box-shadow: var(--shadow-sidebar);
-            display: flex; flex-direction: column; gap: 24px;
-            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .sidebar.open { right: 0; }
-
-        .sidebar-backdrop {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.2); z-index: 99; display: none;
-        }
-
-        .sidebar-header {
-            display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid var(--border); padding-bottom: 14px;
-        }
-        .sidebar-title { font-weight: 700; font-size: 1.05rem; color: #334155; }
-        .close-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #94a3b8; }
-
-        .sidebar-section { display: flex; flex-direction: column; gap: 10px; }
-        .sidebar-section-title { font-size: 0.85rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-
-        /* 사이드바 내 메뉴 링크/버튼 디자인 */
-        .nav-btn {
-            width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border);
-            background: var(--bg-gray); color: #475569; font-size: 0.9rem; font-weight: 600;
-            text-align: left; text-decoration: none; display: flex; align-items: center; gap: 8px;
-            transition: all 0.2s ease; cursor: pointer;
-        }
-        .nav-btn:hover { background: var(--primary-light); color: var(--primary-send); border-color: var(--primary-send); }
-        .nav-btn.action-end { background: rgba(246, 222, 144, 0.3); color: #856341; border-color: var(--accent); }
-        .nav-btn.action-end:hover { background: rgba(246, 222, 144, 0.6); }
-
-        /* 슬라이더 제어 스케일러 디자인 고도화 */
-        .control-item { display: flex; flex-direction: column; gap: 6px; background: var(--bg-gray); padding: 12px; border-radius: 12px; }
-        .control-label-row { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: #64748b; }
-        .control-item input[type="range"] { width: 100%; accent-color: var(--primary-send); margin: 4px 0; cursor: pointer; }
-
-        /* 대화창 내부 */
-        .chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
-        .chat-box::-webkit-scrollbar { width: 4px; }
-        .chat-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-
-        .message { padding: 12px 16px; border-radius: 18px; max-width: 85%; font-size: 0.95rem; line-height: 1.6; word-break: break-word; box-shadow: var(--shadow-sm); }
-        .user-msg { background: var(--primary-send); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .ai-msg { background: var(--ai-bubble); color: #334155; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); }
-
-        .input-container { background: white; padding: 16px 20px; border-top: 1px solid var(--border); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-        .input-area { display: flex; gap: 10px; align-items: center; }
-        input[type="text"] { flex: 1; padding: 12px 18px; border: 1.5px solid var(--border); border-radius: 26px; outline: none; font-size: 1rem; background: #f1f5f9; }
-
-        /* 하단 컴포넌트 버튼 및 펄스 이펙트 색상 변경 */
-        .btn { border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.2s ease; outline: none; }
-        .send-btn { background: var(--primary-send); color: white; border-radius: 14px; width: 60px; height: 44px; font-weight: 600; }
-        .mic-btn { background: #f1f5f9; font-size: 1.3rem; width: 44px; height: 44px; border-radius: 50%; color: #64748b; }
-
-        /* 촌스러운 갈색에서 소프트 딥 블루 테마 펄스로 변경 */
-        .mic-btn.recording { background: var(--primary-send); color: white; animation: softBluePulse 1.5s infinite; }
-
-        @keyframes softBluePulse {
-            0% { box-shadow: 0 0 0 0 var(--primary-pulse); }
-            70% { box-shadow: 0 0 0 10px rgba(110, 142, 181, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(110, 142, 181, 0); }
-        }
-
-        #summary-section {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: white; z-index: 100; padding: 40px 24px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-
-        .summary-card {
-            background: #f8fafc; padding: 24px; border-radius: 16px; width: 100%;
-            margin: 20px 0; line-height: 1.8; border: 1px solid var(--border); color: #334155; font-size: 0.95rem;
-        }
+        .summary-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.95); z-index: 200; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
+        .summary-box { background: var(--bg-card); padding: 24px; border-radius: 12px; width: 100%; border: 1px solid var(--border); margin: 20px 0; line-height: 1.6; font-size: 0.95rem; }
+        .btn-outline { padding: 12px 24px; border-radius: 8px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <!-- Backdrop overlay for closing sidebar -->
-    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
+<script src="/js/header.js"></script>
 
-    <!-- 우측 내비게이션 및 제어 사이드바 -->
-    <div class="sidebar" id="sidebarPanel">
-        <div class="sidebar-header">
-            <span class="sidebar-title">학습 설정 및 메뉴</span>
-            <button class="close-btn" onclick="toggleSidebar(false)">✕</button>
+<main class="chat-container">
+    <div class="status-bar">
+        <div class="char-avatar" id="character"><img id="charImg" src="/images/blob-idle.png"></div>
+        <div class="loading-text" id="statusText">대화 준비 완료</div>
+    </div>
+
+    <div class="chat-box" id="chatBox">
+        <div class="message ai-msg">안녕! 오늘 공부할 내용을 나한테도 들려줄래? 😆</div>
+    </div>
+
+    <div class="bottom-area">
+        <div class="input-wrapper">
+            <button class="mic-btn" id="micBtn">🎤</button>
+            <input type="text" id="userInput" placeholder="메시지 입력..." autocomplete="off">
+            <button class="send-btn" id="sendBtn">전송</button>
         </div>
+        <button class="end-btn" id="endBtn">💾 대화 종료 및 학습 요약하기</button>
+    </div>
 
-        <!-- 슬라이더 환경설정 묶음 -->
-        <div class="sidebar-section">
-            <span class="sidebar-section-title">음성 제어 설정</span>
-            <div class="control-item">
-                <div class="control-label-row">
-                    <span>말하기 속도</span>
-                    <span id="rateVal">1.0x</span>
-                </div>
+    <div class="settings-overlay" id="settingsModal">
+        <div class="settings-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span>음성 제어 설정</span>
+                <button style="border:none; background:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);" onclick="closeSettings()">✕</button>
+            </div>
+            <div class="control-group">
+                <div class="control-label"><span>말하기 속도</span><span id="rateVal">1.0x</span></div>
                 <input type="range" id="rateSlider" min="0.7" max="1.4" step="0.1" value="1.0">
             </div>
-            <div class="control-item">
-                <div class="control-label-row">
-                    <span>출력 볼륨</span>
-                    <span id="volumeVal">0.8</span>
-                </div>
+            <div class="control-group">
+                <div class="control-label"><span>출력 볼륨</span><span id="volumeVal">0.8</span></div>
                 <input type="range" id="volumeSlider" min="0.2" max="1.0" step="0.1" value="0.8">
             </div>
         </div>
-
-        <!-- 메뉴 버튼 링크 묶음 -->
-        <div class="sidebar-section">
-            <span class="sidebar-section-title">메뉴 이동</span>
-            <button class="nav-btn" onclick="goToDashboard()">📊 통계 대시보드</button>
-            <button class="nav-btn" onclick="goToSummaryPage()">📋 전체 학습 요약표</button>
-        </div>
-
-        <div class="sidebar-section" style="margin-top: auto;">
-            <button class="nav-btn action-end" onclick="endConversation()">💾 현재 대화 종료 및 요약</button>
-        </div>
     </div>
 
-    <!-- 메인 뷰 헤더 -->
-    <div class="header">
-        <span class="header-title">나의 스터디 메이트</span>
-        <button class="menu-btn" onclick="toggleSidebar(true)">☰</button>
-    </div>
-
-    <div class="status-bar">
-        <div id="character" class="character-box">
-            <img id="charImage" src="/images/blob-idle.png" style="width: 70px; height: 70px; object-fit: contain;">
-        </div>
-        <div class="loading-text" id="loading">대화 준비 완료</div>
-    </div>
-
-    <div id="chat-section" style="display: contents;">
-        <div class="chat-box" id="chatBox">
-            <div class="message ai-msg">안녕! 오늘 공부할 내용을 나한테도 들려줄래? 😆</div>
-        </div>
-
-        <div class="input-container">
-            <div class="input-area">
-                <button class="btn mic-btn" id="micBtn" onclick="toggleRecording()">🎤</button>
-                <input type="text" id="userInput" placeholder="메시지를 입력하세요..." onkeypress="handleEnter(event)">
-                <button class="btn send-btn" onclick="sendMessage()">전송</button>
-            </div>
+    <div class="summary-overlay" id="summaryOverlay">
+        <div style="font-size: 3rem; margin-bottom: 10px;">📊</div>
+        <h2 style="margin: 0;">학습 요약 완료</h2>
+        <div class="summary-box" id="summaryContent">요약을 생성하고 있습니다...</div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-outline" onclick="location.reload()">다시 하기</button>
+            <button class="btn-outline" style="background: var(--primary); color: white; border-color: var(--primary);" onclick="window.location.href='/summary.html'">요약표 보기</button>
         </div>
     </div>
-
-    <!-- 대화 종료 시 노출될 요약 섹션 -->
-    <div id="summary-section" style="display: none;">
-        <div style="font-size: 2.5rem;">📊</div>
-        <h2>학습 요약 완료</h2>
-        <div class="summary-card" id="summaryContent">요약을 생성하고 있습니다...</div>
-        <div style="display: flex; gap: 12px; width: 100%;">
-            <button class="btn" onclick="location.reload()" style="flex: 1; height: 44px; border-radius: 12px; background: #94a3b8; color: white; font-weight:600;">다시 하기</button>
-            <button class="btn" onclick="goToDashboard()" style="flex: 1; height: 44px; border-radius: 12px; background: #6d8db4; color: white; font-weight:600;">대시보드 보기</button>
-        </div>
-    </div>
-</div>
+</main>
 
 <script>
-    let sessionId = localStorage.getItem('msm_session_id');
-    if (!sessionId) {
-        sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('msm_session_id', sessionId);
-    }
-
+    const token = localStorage.getItem('jwt_token');
     const chatBox = document.getElementById('chatBox');
-    const inputField = document.getElementById('userInput');
-    const loading = document.getElementById('loading');
-    const character = document.getElementById('character');
-    const micBtn = document.getElementById('micBtn');
+    const userInput = document.getElementById('userInput');
+    const statusText = document.getElementById('statusText');
+    const charImg = document.getElementById('charImg');
 
+    const settingsModal = document.getElementById('settingsModal');
     const rateSlider = document.getElementById('rateSlider');
     const volumeSlider = document.getElementById('volumeSlider');
-    const sidebarPanel = document.getElementById('sidebarPanel');
-    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const micBtn = document.getElementById('micBtn');
 
-    let globalStream = null;
-    let audioContext, analyser, dataArray;
+    document.body.addEventListener('click', (e) => {
+        if (e.target.id === 'globalSettingsBtn' || e.target.closest('#globalSettingsBtn')) {
+            settingsModal.style.display = 'flex';
+        }
+    });
+    function closeSettings() { settingsModal.style.display = 'none'; }
+    settingsModal.onclick = closeSettings;
 
-    let isAutoMode = false;
-    let isPlaying = false;
-    let isWaitingForAi = false;
-    let isRecording = false;
+    rateSlider.oninput = e => document.getElementById('rateVal').innerText = e.target.value + 'x';
+    volumeSlider.oninput = e => document.getElementById('volumeVal').innerText = e.target.value;
 
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let currentAudio = null;
-    const audioQueue = [];
+    function setUiState(state) {
+        if(state === 'idle') { charImg.src = "/images/blob-idle.png"; statusText.innerText = "대기 중"; }
+        if(state === 'listening') { charImg.src = "/images/blob-listening.gif"; statusText.innerText = "듣고 있어요..."; }
+        if(state === 'thinking') { charImg.src = "/images/blob-thinking.gif"; statusText.innerText = "생각 중..."; }
+        if(state === 'speaking') { charImg.src = "/images/blob-speaking.gif"; statusText.innerText = "답변 중!"; }
+    }
+
+    function appendMsg(text, type) {
+        const div = document.createElement('div');
+        div.className = `message ${type}`;
+        div.innerText = text;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function formatMarkdown(text) {
+        let html = text.trim();
+        html = html.replace(/^###\s+(.*)/gm, '<div style="font-weight:800; margin-bottom:4px;">$1</div>');
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\n/g, '<br>'); return html;
+    }
+
+    document.getElementById('sendBtn').onclick = sendText;
+    userInput.onkeypress = e => { if(e.key === 'Enter') sendText(); };
+
+    async function sendText() {
+        const text = userInput.value.trim();
+        if(!text) return;
+        stopAiAudio();
+        appendMsg(text, 'user-msg');
+        userInput.value = '';
+        setUiState('thinking');
+        isWaitingForAi = true;
+
+        try {
+            await fetch('/api/v1/learning/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
+                body: text
+            });
+        } catch(e) { console.error(e); isWaitingForAi = false; setUiState('idle'); }
+    }
+
     let eventSource = null;
-
     let currentAiTurnContainer = null;
     let currentAiTurnText = "";
 
-    let silenceStart = null;
-    let totalSilenceStart = null;
-    let hasSpokenInChunk = false;
+    function connectSSE() {
+        if(eventSource) eventSource.close();
+        eventSource = new EventSource(`/api/v1/learning/subscribe?token=${token}`);
 
-    const SPEECH_THRESHOLD = 0.03;
-    const CHUNK_SILENCE_MS = 1400;
-    const MAX_SILENCE_MS = 8000;
+        eventSource.addEventListener('message', (e) => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') { hasSpokenInChunk = false; mediaRecorder.stop(); }
+            isWaitingForAi = true;
+            const data = JSON.parse(e.data);
+            renderStreaming(data.text);
+            if (data.audio) { audioQueue.push("data:audio/mp3;base64," + data.audio); playNextInQueue(); }
+        });
 
-    // Sidebar UI Control Logic
-    function toggleSidebar(open) {
-        if (open) {
-            sidebarPanel.classList.add('open');
-            sidebarBackdrop.style.display = 'block';
-        } else {
-            sidebarPanel.classList.remove('open');
-            sidebarBackdrop.style.display = 'none';
+        eventSource.onerror = () => {
+            console.warn("SSE disconnected. Retrying in 2 seconds...");
+            eventSource.close();
+            setTimeout(connectSSE, 2000);
+        };
+    }
+    connectSSE();
+
+    function renderStreaming(tokenText) {
+        if (!currentAiTurnContainer) {
+            currentAiTurnContainer = document.createElement('div');
+            currentAiTurnContainer.className = 'message ai-msg';
+            chatBox.appendChild(currentAiTurnContainer);
         }
+        currentAiTurnText += tokenText;
+        currentAiTurnContainer.innerHTML = formatMarkdown(currentAiTurnText);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        setUiState('speaking');
     }
 
-    rateSlider.addEventListener('input', (e) => document.getElementById('rateVal').textContent = e.target.value + 'x');
-    volumeSlider.addEventListener('input', (e) => document.getElementById('volumeVal').textContent = e.target.value);
+    let globalStream = null, audioContext, analyser, dataArray;
+    let isAutoMode = false, isPlaying = false, isWaitingForAi = false, isRecording = false;
+    let mediaRecorder = null, audioChunks = [], currentAudio = null, audioQueue = [];
+    let silenceStart = null, totalSilenceStart = null, hasSpokenInChunk = false;
 
-    function updateUIState(state) {
-        character.className = `character-box state-${state}`;
-        const charImage = document.getElementById('charImage');
-        if (state === 'idle') { charImage.src = "/images/blob-idle.png"; loading.textContent = "대기 중"; }
-        else if (state === 'listening') { charImage.src = "/images/blob-listening.gif"; loading.textContent = "듣고 있어요..."; }
-        else if (state === 'analyzing') { charImage.src = "/images/blob-thinking.gif"; loading.textContent = "생각 중..."; }
-        else if (state === 'speaking') { charImage.src = "/images/blob-speaking.gif"; loading.textContent = "답변 중!"; }
-    }
+    const SPEECH_THRESHOLD = 0.03, CHUNK_SILENCE_MS = 1400, MAX_SILENCE_MS = 8000;
 
     function stopAiAudio() {
         if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
-        audioQueue.length = 0;
-        isPlaying = false;
-        isWaitingForAi = false;
-        currentAiTurnContainer = null;
-        currentAiTurnText = "";
-        if (eventSource) { eventSource.close(); eventSource = null; initSseConnection(); }
-        updateUIState('idle');
+        audioQueue.length = 0; isPlaying = false; isWaitingForAi = false;
+        currentAiTurnContainer = null; currentAiTurnText = "";
+        setUiState('idle');
     }
 
-    async function toggleRecording() {
+    function playNextInQueue() {
+        if (isPlaying || audioQueue.length === 0) return;
+        isPlaying = true;
+        currentAudio = new Audio(audioQueue.shift());
+        currentAudio.playbackRate = parseFloat(rateSlider.value);
+        currentAudio.volume = parseFloat(volumeSlider.value);
+        currentAudio.play();
+
+        currentAudio.onended = () => {
+            isPlaying = false;
+            if (audioQueue.length > 0) playNextInQueue();
+            else {
+                isWaitingForAi = false; currentAudio = null; currentAiTurnContainer = null; currentAiTurnText = "";
+                if (isAutoMode) startContinuousListening(); else setUiState('idle');
+            }
+        };
+    }
+
+    micBtn.onclick = async () => {
         if (isAutoMode) {
-            isAutoMode = false;
-            stopAiAudio();
+            isAutoMode = false; stopAiAudio();
             if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-            micBtn.textContent = '🎤';
-            micBtn.classList.remove('recording');
+            micBtn.textContent = '🎤'; micBtn.classList.remove('recording');
         } else {
             isAutoMode = true;
-            micBtn.textContent = '⏹️';
-            micBtn.classList.add('recording');
-
+            stopAiAudio(); // Halt AI audio and arrays instantly upon activation
+            micBtn.textContent = '⏹️'; micBtn.classList.add('recording');
             if (!globalStream) {
                 try {
                     globalStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -339,233 +260,86 @@
                     source.connect(analyser);
                     dataArray = new Float32Array(analyser.frequencyBinCount);
                     monitorVAD();
-                } catch (e) {
-                    alert("마이크 권한이 필요합니다.");
-                    isAutoMode = false;
-                    return;
-                }
+                } catch (e) { alert("마이크 권한이 필요합니다."); isAutoMode = false; micBtn.classList.remove('recording'); return; }
             }
             startContinuousListening();
         }
-    }
+    };
 
     function monitorVAD() {
         requestAnimationFrame(monitorVAD);
         if (!isAutoMode || !isRecording) return;
-
         analyser.getFloatTimeDomainData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
+        let sum = 0; for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
         let rms = Math.sqrt(sum / dataArray.length);
 
         if (rms > SPEECH_THRESHOLD) {
-            if (isPlaying || isWaitingForAi) {
-                stopAiAudio();
-            }
-            hasSpokenInChunk = true;
-            silenceStart = null;
-            totalSilenceStart = Date.now();
-            updateUIState('listening');
+            if (isPlaying || isWaitingForAi) stopAiAudio();
+            hasSpokenInChunk = true; silenceStart = null; totalSilenceStart = Date.now();
+            setUiState('listening');
         } else {
             if (isPlaying || isWaitingForAi) return;
-
             if (hasSpokenInChunk) {
                 if (!silenceStart) silenceStart = Date.now();
-                else if (Date.now() - silenceStart > CHUNK_SILENCE_MS) {
-                    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-                }
+                else if (Date.now() - silenceStart > CHUNK_SILENCE_MS) { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); }
             } else {
                 if (!totalSilenceStart) totalSilenceStart = Date.now();
-                else if (Date.now() - totalSilenceStart > MAX_SILENCE_MS) {
-                    triggerForceAiResponse();
-                }
+                else if (Date.now() - totalSilenceStart > MAX_SILENCE_MS) triggerForceAiResponse();
             }
         }
     }
 
     function startContinuousListening() {
         if (!isAutoMode || isPlaying || isWaitingForAi) return;
-
-        audioChunks = [];
-        hasSpokenInChunk = false;
-        silenceStart = null;
-        totalSilenceStart = Date.now();
-
+        audioChunks = []; hasSpokenInChunk = false; silenceStart = null; totalSilenceStart = Date.now();
         mediaRecorder = new MediaRecorder(globalStream);
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
         mediaRecorder.onstop = () => {
-            isRecording = false;
-            const blob = new Blob(audioChunks, { type: 'audio/webm' });
-
-            if (hasSpokenInChunk && blob.size > 1000) {
-                sendChunkToServer(blob);
-            }
-            if (isAutoMode && !isWaitingForAi && !isPlaying) {
-                startContinuousListening();
-            }
+            isRecording = false; const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            if (hasSpokenInChunk && blob.size > 1000) sendChunkToServer(blob);
+            if (isAutoMode && !isWaitingForAi && !isPlaying) startContinuousListening();
         };
-
-        mediaRecorder.start();
-        isRecording = true;
-        updateUIState('listening');
+        mediaRecorder.start(); isRecording = true; setUiState('listening');
     }
 
     async function sendChunkToServer(blob) {
-        const formData = new FormData();
-        formData.append('audio', blob, 'voice.webm');
+        const formData = new FormData(); formData.append('audio', blob, 'voice.webm');
         try {
-            const response = await fetch(`/api/v1/learning/audio?sessionId=${sessionId}`, { method: 'POST', body: formData });
-            if (response.ok) {
-                const text = await response.text();
-                if (text.trim() !== "") appendMessage("🎤 " + text, 'user-msg');
-            }
-        } catch (error) {}
+            const res = await fetch(`/api/v1/learning/audio`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+            if (res.ok) { const text = await res.text(); if (text.trim() !== "") appendMsg("🎤 " + text, 'user-msg'); }
+        } catch (e) {}
     }
 
     function triggerForceAiResponse() {
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-        isWaitingForAi = true;
-        updateUIState('analyzing');
-        appendMessage("...", 'user-msg');
-
-        fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
+        isWaitingForAi = true; setUiState('thinking'); appendMsg("...", 'user-msg');
+        fetch(`/api/v1/learning/chat`, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
             body: "(System Notice: Prompt user to continue expression.)"
-        }).catch(() => {
-            isWaitingForAi = false;
-            if (isAutoMode) startContinuousListening();
-        });
+        }).catch(() => { isWaitingForAi = false; if (isAutoMode) startContinuousListening(); });
     }
 
-    function initSseConnection() {
-        if (eventSource) eventSource.close();
-        eventSource = new EventSource(`/api/v1/learning/subscribe?sessionId=${sessionId}`);
-
-        eventSource.addEventListener('message', (event) => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                hasSpokenInChunk = false;
-                mediaRecorder.stop();
-            }
-            isWaitingForAi = true;
-            const data = JSON.parse(event.data);
-            renderStreamingMarkdown(data.text);
-
-            if (data.audio) {
-                audioQueue.push("data:audio/mp3;base64," + data.audio);
-                playNextInQueue();
-            }
-        });
-    }
-    initSseConnection();
-
-    function formatMarkdown(text) {
-        let html = text.trim();
-        html = html.replace(/^###\s+(.*)/gm, '<div style="font-size:1.1em; font-weight:800; color:var(--primary-send); margin-bottom:4px;">$1</div>');
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\n/g, '<br>');
-        return html;
-    }
-
-    function renderStreamingMarkdown(token) {
-        if (!currentAiTurnContainer) {
-            currentAiTurnContainer = document.createElement('div');
-            currentAiTurnContainer.style.display = 'flex';
-            currentAiTurnContainer.style.flexDirection = 'column';
-            currentAiTurnContainer.style.gap = '8px';
-            currentAiTurnContainer.style.marginBottom = '14px';
-            chatBox.appendChild(currentAiTurnContainer);
-        }
-
-        currentAiTurnText += token;
-        let chunks = currentAiTurnText.split(/(?=### )|(?=\n\n)/).filter(c => c.trim().length > 0);
-
-        currentAiTurnContainer.innerHTML = '';
-        chunks.forEach(chunk => {
-            let msgDiv = document.createElement('div');
-            msgDiv.className = 'message ai-msg';
-            msgDiv.innerHTML = formatMarkdown(chunk);
-            currentAiTurnContainer.appendChild(msgDiv);
-        });
-
-        chatBox.scrollTop = chatBox.scrollHeight;
-        updateUIState('speaking');
-    }
-
-    function playNextInQueue() {
-        if (isPlaying || audioQueue.length === 0) return;
-        isPlaying = true;
-
-        currentAudio = new Audio(audioQueue.shift());
-        currentAudio.playbackRate = parseFloat(rateSlider.value);
-        currentAudio.volume = parseFloat(volumeSlider.value);
-
-        currentAudio.play();
-        currentAudio.onended = () => {
-            isPlaying = false;
-            if (audioQueue.length > 0) {
-                playNextInQueue();
-            } else {
-                isWaitingForAi = false;
-                currentAudio = null;
-                currentAiTurnContainer = null;
-                currentAiTurnText = "";
-                if (isAutoMode) startContinuousListening();
-                else updateUIState('idle');
-            }
-        };
-    }
-
-    function appendMessage(text, className) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${className}`;
-        msgDiv.textContent = text;
-        chatBox.appendChild(msgDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
-
-    async function sendMessage() {
-        const text = inputField.value.trim();
-        if (!text) return;
-        stopAiAudio();
-        appendMessage(text, 'user-msg');
-        inputField.value = '';
-        isWaitingForAi = true;
-        updateUIState('analyzing');
-        try {
-            await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
-                method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text
-            });
-        } catch (error) {
-            isWaitingForAi = false;
-            if (isAutoMode) startContinuousListening();
-        }
-    }
-
-    async function endConversation() {
-        toggleSidebar(false); // Close sidebar panel first
+    document.getElementById('endBtn').onclick = async () => {
         const topic = prompt("오늘 복습한 핵심 키워드가 뭐야?", "자유 주제");
-        if (!topic) return;
-        document.getElementById('chat-section').style.display = 'none';
-        document.getElementById('summary-section').style.display = 'flex';
-        isAutoMode = false;
-        stopAiAudio();
+        if(!topic) return;
+
+        document.getElementById('summaryOverlay').style.display = 'flex';
+        isAutoMode = false; stopAiAudio();
         if (globalStream) globalStream.getTracks().forEach(t => t.stop());
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
 
         try {
-            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, { method: 'POST' });
-            if (response.ok) {
+            const res = await fetch(`/api/v1/learning/summary?topic=${encodeURIComponent(topic)}`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if(res.ok) {
                 document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 주제 요약이 데이터베이스에 정상 반영되었습니다.`;
+            } else {
+                document.getElementById('summaryContent').innerHTML = "서버 에러로 요약을 저장하지 못했습니다.";
             }
-        } catch (error) {
-            document.getElementById('summaryContent').innerHTML = "요약 처리 중 네트워크 에러 발생";
-        }
-    }
-
-    function goToDashboard() { window.location.href = `/dashboard.html`; }
-    function goToSummaryPage() { window.location.href = `/summary.html`; }
+        } catch(e) { document.getElementById('summaryContent').innerHTML = "네트워크 에러 발생"; }
+    };
 </script>
 </body>
 </html>

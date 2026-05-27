@@ -47,6 +47,14 @@ dependencies {
     implementation 'com.github.codemonstur:embedded-redis:1.4.3'
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
 
+    // Spring Security framework
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // JWT token parsing and generation
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
 }
 
 

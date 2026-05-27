@@ -20,14 +20,22 @@ public class Explanation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String sessionId;
+    @Column(nullable = false, name = "user_email")
+    private String userEmail;
 
-    private String topic; // 💡 별도 컬럼으로 분리
+    private String topic;
 
     @Column(columnDefinition = "TEXT")
-    private String summary; // 💡 content 대신 summary로 변경
+    private String summary;
 
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    public void updateCategory(Long categoryId) {
+        this.categoryId = categoryId;
+    }
 }

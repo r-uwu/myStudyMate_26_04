@@ -3,357 +3,477 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mystudymate 학습 요약표</title>
+    <title>학습 요약표 | 나의 스터디 메이트</title>
+    <script>
+        if (!localStorage.getItem('jwt_token')) window.location.href = '/login.html';
+    </script>
     <style>
+        /* 모던 SaaS 디자인 변수 (index.html과 통일) */
         :root {
-            --primary-color: #6e8eb5;
-            --primary-light: #eff4fa;
-            --secondary-color: #a1b3c6;
-            --accent-yellow: #f6de90;
-            --accent-brown: #856341;
-            --bg-color: #f4f7fa;
-            --card-bg: #ffffff;
-            --text-main: #2d3748;
-            --text-muted: #718096;
-            --border-color: #e2e8f0;
-            --shadow-soft: 0 10px 25px rgba(110, 142, 181, 0.08);
-            --shadow-hover: 0 15px 35px rgba(110, 142, 181, 0.15);
+            --bg-main: #f8fafc; --bg-card: #ffffff;
+            --text-main: #0f172a; --text-muted: #64748b;
+            --border: #e2e8f0; --primary: #3b82f6; --primary-hover: #2563eb;
+            --primary-light: #eff6ff;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --radius-md: 12px; --radius-lg: 16px;
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #0f172a;
-                --card-bg: #1e293b;
-                --text-main: #f1f5f9;
-                --text-muted: #94a3b8;
-                --border-color: #334155;
-                --primary-light: rgba(110, 142, 181, 0.15);
-                --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.3);
-                --shadow-hover: 0 15px 35px rgba(0, 0, 0, 0.5);
-            }
-        }
+        * { box-sizing: border-box; }
 
         body {
-            font-family: 'Pretendard', -apple-system, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            line-height: 1.6;
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-main); color: var(--text-main);
+            margin: 0; display: flex; flex-direction: column;
+            height: 100dvh; overflow: hidden;
         }
 
-        .dashboard-container {
-            width: 100%;
-            max-width: 1100px;
-            padding: 3rem 1.5rem;
-            box-sizing: border-box;
+        /* 메인 레이아웃 (헤더 제외한 나머지 영역 2단 분할) */
+        .app-layout {
+            flex: 1; display: flex; width: 100%; max-width: 1200px;
+            margin: 0 auto; overflow: hidden; background: var(--bg-main);
         }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 2px solid var(--border-color);
+        /* 좌측 카테고리 사이드바 */
+        .sidebar {
+            width: 260px; background: var(--bg-card); border-right: 1px solid var(--border);
+            border-left: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 24px 20px; flex-shrink: 0;
         }
 
-        h1 { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--primary-color); letter-spacing: -0.02em; }
+        .sidebar-title { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 12px; padding-left: 8px; }
 
-        .nav-links a {
-            padding: 0.6rem 1.25rem;
-            background-color: var(--card-bg);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            margin-left: 0.5rem;
+        .category-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+        .category-item {
+            padding: 10px 12px; border-radius: 8px; cursor: pointer;
+            font-weight: 600; font-size: 0.95rem; color: var(--text-main); transition: all 0.2s;
+            display: flex; align-items: center; gap: 8px;
         }
+        .category-item:hover { background: var(--bg-main); }
+        .category-item.active { background: var(--primary-light); color: var(--primary); }
 
-        .nav-links a:hover { background-color: var(--bg-color); border-color: var(--secondary-color); }
-        .nav-links a.active { background-color: var(--primary-color); color: #ffffff; border-color: var(--primary-color); }
-        .nav-links a.home-btn { background-color: var(--accent-yellow); color: var(--accent-brown); border-color: var(--accent-yellow); }
-        .nav-links a.home-btn:hover { filter: brightness(0.95); }
+        .add-category-btn {
+            margin-top: 16px; padding: 12px; border: 1px dashed #cbd5e1;
+            border-radius: 8px; background: none; color: var(--text-muted);
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .add-category-btn:hover { background: var(--bg-main); color: var(--text-main); border-color: var(--text-muted); }
 
-        /* 검색 툴바 디자인 */
+        /* 우측 메인 콘텐츠 */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-main); border-right: 1px solid var(--border); }
+
+        /* 검색 툴바 */
         .toolbar {
-            margin-bottom: 2rem;
-            display: flex;
-            gap: 1rem;
+            padding: 20px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;
         }
 
+        .search-group { display: flex; gap: 12px; flex: 1; max-width: 700px; align-items: center; }
         .search-input {
-            flex: 1;
-            padding: 0.8rem 1.5rem;
-            border-radius: 30px;
-            border: 1px solid var(--border-color);
-            background-color: var(--card-bg);
-            color: var(--text-main);
-            font-size: 1rem;
-            outline: none;
-            box-shadow: var(--shadow-soft);
-            transition: border-color 0.2s;
+            flex: 1; padding: 10px 16px; border: 1px solid var(--border);
+            border-radius: 24px; font-size: 0.95rem; outline: none; background: var(--bg-main);
+            color: var(--text-main); transition: border-color 0.2s;
         }
+        .search-input:focus { border-color: var(--primary); }
 
-        .search-input:focus {
-            border-color: var(--primary-color);
+        .date-input {
+            padding: 10px 14px; border: 1px solid var(--border); background: var(--bg-main);
+            border-radius: 8px; font-size: 0.9rem; color: var(--text-main); outline: none;
         }
+        .reset-btn { padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); transition: 0.2s; }
+        .reset-btn:hover { background: var(--bg-main); color: var(--text-main); }
 
-        /* 날짜별 타임라인 구분선 */
-        .timeline-group {
-            margin-bottom: 3rem;
-        }
+        .view-toggle { display: flex; background: var(--bg-main); border-radius: 8px; padding: 4px; border: 1px solid var(--border); }
+        .view-btn { padding: 8px 16px; border: none; background: none; border-radius: 6px; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: 0.2s; }
+        .view-btn.active { background: var(--bg-card); color: var(--primary); box-shadow: var(--shadow-sm); }
 
+        /* 데이터 뷰포트 */
+        .viewport { flex: 1; overflow-y: auto; padding: 24px; scroll-behavior: smooth; }
+
+        /* 타임라인 뷰 */
+        .timeline-group { margin-bottom: 40px; }
         .timeline-date {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            font-size: 1.1rem;
-            font-weight: 800;
-            color: var(--primary-color);
-            margin-bottom: 1.5rem;
+            font-size: 1.1rem; font-weight: 700; color: var(--text-main);
+            margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
         }
+        .timeline-date::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-        .timeline-date::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background-color: var(--border-color);
-        }
-
-        /* 그리드 & 카드 디자인 */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-            gap: 1.5rem;
-        }
-
-        @media (max-width: 768px) {
-            .summary-grid { grid-template-columns: 1fr; }
-        }
-
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
         .summary-card {
-            background-color: var(--card-bg);
-            border-radius: 16px;
-            padding: 1.8rem;
-            box-shadow: var(--shadow-soft);
-            border: 1px solid var(--border-color);
-            border-top: 5px solid var(--primary-color);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            display: flex;
-            flex-direction: column;
+            background: var(--bg-card); border-radius: var(--radius-md); padding: 20px;
+            box-shadow: var(--shadow-sm); border: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .summary-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .topic-badge { background: var(--primary-light); color: var(--primary); padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; }
+
+        .card-body { font-size: 0.95rem; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; flex: 1; margin-bottom: 16px; }
+
+        .card-footer { padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+        .category-select {
+            padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border);
+            font-size: 0.85rem; background: var(--bg-main); color: var(--text-main); outline: none; cursor: pointer; font-weight: 500;
         }
 
-        .summary-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-hover);
+        /* 캘린더 뷰 */
+        .calendar-view { display: none; background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; font-weight: 800; font-size: 1.2rem; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+        .cal-day-header { text-align: center; font-weight: 700; color: var(--text-muted); font-size: 0.9rem; padding-bottom: 8px; }
+        .cal-cell {
+            min-height: 120px; border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; background: var(--bg-card); transition: 0.2s;
+        }
+        .cal-cell:hover { border-color: #cbd5e1; background: var(--bg-main); }
+        .cal-date { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); align-self: flex-end; }
+        .cal-item {
+            background: var(--primary-light); color: var(--primary);
+            font-size: 0.75rem; font-weight: 700; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-all;
         }
 
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.2rem;
-        }
-
-        .topic-badge {
-            background-color: var(--primary-light);
-            color: var(--primary-color);
-            padding: 0.4rem 1rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .time-text {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .card-body {
-            font-size: 0.95rem;
-            color: var(--text-main);
-            white-space: pre-wrap;
-            line-height: 1.8;
-            background: var(--bg-color);
-            padding: 1.2rem;
-            border-radius: 12px;
-            flex-grow: 1;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 5rem 0;
-            color: var(--text-muted);
-            background-color: var(--card-bg);
-            border-radius: 16px;
-            border: 2px dashed var(--border-color);
-            font-weight: 500;
-        }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-weight: 600; font-size: 1rem; }
     </style>
 </head>
 <body>
 
-<div class="dashboard-container">
-    <header>
-        <h1>나의 학습 요약표</h1>
-        <div class="nav-links">
-            <a href="/index.html" class="home-btn">💬 대화하기</a>
-            <a href="/summary.html" class="active">학습 요약표</a>
-            <a href="/dashboard.html">통계 대시보드</a>
-        </div>
-    </header>
+<script src="/js/header.js"></script>
 
-    <div class="toolbar">
-        <input type="text" id="searchInput" class="search-input" placeholder="주제나 요약 내용을 검색해보세요..." onkeyup="filterData()">
-    </div>
-
-    <div id="mainContainer">
-        <div class="empty-state" id="loadingState">
-            데이터를 불러오는 중입니다... 🏃‍♂️
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-title">CATEGORIES</div>
+        <div class="category-list" id="categoryList">
         </div>
-    </div>
+        <button class="add-category-btn" onclick="promptAddCategory()">+ 새 카테고리 추가</button>
+    </aside>
+
+    <main class="main-content">
+        <div class="toolbar">
+            <div class="search-group">
+                <input type="text" id="searchInput" class="search-input" placeholder="주제 또는 요약 내용 검색..." onkeyup="applyFrontendFilters()">
+                <input type="date" id="startDate" class="date-input" onchange="applyFrontendFilters()">
+                <span style="color: var(--text-muted); font-weight: bold;">~</span>
+                <input type="date" id="endDate" class="date-input" onchange="applyFrontendFilters()">
+                <button class="reset-btn" onclick="resetDateFilter()">초기화</button>
+            </div>
+            <div class="view-toggle">
+                <button class="view-btn active" id="btnTimeline" onclick="toggleView('timeline')">리스트</button>
+                <button class="view-btn" id="btnCalendar" onclick="toggleView('calendar')">캘린더</button>
+            </div>
+        </div>
+
+        <div class="viewport">
+            <div id="timelineView"></div>
+
+            <div id="calendarView" class="calendar-view">
+                <div class="calendar-header">
+                    <button class="reset-btn" onclick="changeMonth(-1)">◀ 이전달</button>
+                    <span id="currentMonthLabel"></span>
+                    <button class="reset-btn" onclick="changeMonth(1)">다음달 ▶</button>
+                </div>
+                <div class="calendar-grid" id="calendarGrid">
+                    <div class="cal-day-header">일</div><div class="cal-day-header">월</div><div class="cal-day-header">화</div>
+                    <div class="cal-day-header">수</div><div class="cal-day-header">목</div><div class="cal-day-header">금</div><div class="cal-day-header">토</div>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 
 <script>
-    let allHistoryData = []; // DB에서 가져온 원본 데이터 저장
+    const token = localStorage.getItem('jwt_token');
+    let sessionId = localStorage.getItem('msm_session_id') || 'session_default';
+    if (!localStorage.getItem('msm_session_id')) localStorage.setItem('msm_session_id', sessionId);
+
+    let rawData = [];
+    let categories = [];
+    let currentCategoryId = 'all';
+    let currentCalDate = new Date();
 
     document.addEventListener('DOMContentLoaded', () => {
-        let sessionId = localStorage.getItem('msm_session_id') || 'session_default';
-        loadHistoryData(sessionId);
+        initDashboard();
     });
 
-    // 1. 실제 DB에서 데이터 Fetch
-    async function loadHistoryData(sessionId) {
-        const container = document.getElementById('mainContainer');
+    async function initDashboard() {
+        await loadCategories();
+        await loadHistoryData();
+    }
+
+    // --- API 통신 영역 ---
+    async function loadCategories() {
+        try {
+            const response = await fetch(`/api/v1/learning/categories?sessionId=${sessionId}`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (response.ok) {
+                categories = await response.json();
+                renderCategories();
+            }
+        } catch (error) {
+            console.error("Category Load Error:", error);
+            renderCategories();
+        }
+    }
+
+    async function promptAddCategory() {
+        const name = prompt("새 카테고리 이름을 입력하세요:");
+        if (!name || !name.trim()) return;
 
         try {
-            const response = await fetch(`/api/v1/learning/history?sessionId=${sessionId}`);
+            const response = await fetch(`/api/v1/learning/categories?sessionId=${sessionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify(name.trim())
+            });
 
             if (response.ok) {
-                const rawData = await response.json();
+                const newCategory = await response.json();
+                categories.push(newCategory);
+                renderCategories();
+                applyFrontendFilters();
+            } else {
+                alert("카테고리 생성에 실패했습니다.");
+            }
+        } catch (error) { console.error("Category Create Error:", error); }
+    }
 
-                // 데이터를 날짜 파싱하기 쉽게 전처리
-                allHistoryData = rawData.map(item => {
-                    let dateObj;
+    async function updateCategory(summaryId, newCategoryId) {
+        try {
+            const url = newCategoryId
+                ? `/api/v1/learning/history/${summaryId}/category?categoryId=${newCategoryId}`
+                : `/api/v1/learning/history/${summaryId}/category`;
+
+            const response = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const item = rawData.find(d => d.id === summaryId);
+                if (item) item.categoryId = newCategoryId ? parseInt(newCategoryId) : null;
+            } else {
+                alert("카테고리 변경에 실패했습니다.");
+            }
+        } catch (error) { alert("카테고리 변경 중 오류가 발생했습니다."); }
+    }
+
+    async function loadHistoryData() {
+        try {
+            const response = await fetch(`/api/v1/learning/history`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                rawData = data.map(item => {
+                    let dateObj = new Date();
                     if (Array.isArray(item.createdAt)) {
                         dateObj = new Date(item.createdAt[0], item.createdAt[1] - 1, item.createdAt[2], item.createdAt[3] || 0, item.createdAt[4] || 0);
                     } else if (item.createdAt) {
                         dateObj = new Date(item.createdAt);
-                    } else {
-                        dateObj = new Date();
                     }
                     return { ...item, parsedDate: dateObj };
                 });
-
-                // 최신순 정렬
-                allHistoryData.sort((a, b) => b.parsedDate - a.parsedDate);
-
-                renderTimeline(allHistoryData);
-            } else {
-                throw new Error("API Response Error");
+                applyFrontendFilters();
             }
         } catch (error) {
-            container.innerHTML = `<div class="empty-state">데이터를 불러오는데 실패했습니다. 서버 상태를 확인해주세요. 💦</div>`;
+            document.getElementById('timelineView').innerHTML = `<div class="empty-state">데이터를 불러오는데 실패했습니다. 서버를 확인해주세요.</div>`;
         }
     }
 
-    // 2. 검색 필터링 로직 (프론트엔드 단독 처리)
-    function filterData() {
-        const keyword = document.getElementById('searchInput').value.toLowerCase();
+    // --- 렌더링 및 필터링 영역 ---
+    function applyFrontendFilters() {
+        const keyword = (document.getElementById('searchInput').value || '').toLowerCase();
+        const startStr = document.getElementById('startDate').value;
+        const endStr = document.getElementById('endDate').value;
 
-        if (!keyword) {
-            renderTimeline(allHistoryData);
-            return;
+        let filtered = rawData;
+
+        if (currentCategoryId !== 'all') {
+            filtered = filtered.filter(item => item.categoryId == currentCategoryId);
         }
 
-        const filteredData = allHistoryData.filter(item => {
-            const topicMatch = item.topic && item.topic.toLowerCase().includes(keyword);
-            const summaryMatch = item.summary && item.summary.toLowerCase().includes(keyword);
-            return topicMatch || summaryMatch;
+        if (keyword) {
+            filtered = filtered.filter(item =>
+                (item.topic && item.topic.toLowerCase().includes(keyword)) ||
+                (item.summary && item.summary.toLowerCase().includes(keyword))
+            );
+        }
+
+        if (startStr || endStr) {
+            let startTimestamp = null;
+            if (startStr) {
+                const [y, m, d] = startStr.split('-');
+                startTimestamp = new Date(y, m - 1, d, 0, 0, 0).getTime();
+            }
+
+            let endTimestamp = null;
+            if (endStr) {
+                const [y, m, d] = endStr.split('-');
+                endTimestamp = new Date(y, m - 1, d, 23, 59, 59).getTime();
+            }
+
+            filtered = filtered.filter(item => {
+                const itemTime = item.parsedDate.getTime();
+                let isValid = true;
+                if (startTimestamp && itemTime < startTimestamp) isValid = false;
+                if (endTimestamp && itemTime > endTimestamp) isValid = false;
+                return isValid;
+            });
+        }
+
+        filtered.sort((a, b) => b.parsedDate - a.parsedDate);
+        renderTimeline(filtered);
+        renderCalendar(filtered);
+    }
+
+    function renderCategories() {
+        const list = document.getElementById('categoryList');
+        if (!list) return;
+
+        list.innerHTML = `<div class="category-item ${currentCategoryId === 'all' ? 'active' : ''}" onclick="filterByCategory('all')">📁 전체 보기</div>`;
+        categories.forEach(cat => {
+            const safeName = escapeHtml(cat.name);
+            list.innerHTML += `<div class="category-item ${currentCategoryId == cat.id ? 'active' : ''}" onclick="filterByCategory('${cat.id}')">📁 ${safeName}</div>`;
         });
-
-        renderTimeline(filteredData);
     }
 
-    // 3. 날짜별 그룹화 및 화면 렌더링 (메신저 스타일)
+    function filterByCategory(catId) {
+        currentCategoryId = catId;
+        renderCategories();
+        applyFrontendFilters();
+    }
+
     function renderTimeline(dataList) {
-        const container = document.getElementById('mainContainer');
+        const container = document.getElementById('timelineView');
+        if (!container) return;
         container.innerHTML = '';
 
-        if (dataList.length === 0) {
-            container.innerHTML = `<div class="empty-state">조건에 맞는 학습 세션이 없습니다. 🚀</div>`;
+        if (!dataList || dataList.length === 0) {
+            container.innerHTML = '<div class="empty-state">조건에 맞는 학습 기록이 없습니다.</div>';
             return;
         }
 
-        // 데이터를 날짜 문자열(예: "2026년 5월 25일") 기준으로 그룹화
-        const groupedData = dataList.reduce((acc, item) => {
-            const dateStr = !isNaN(item.parsedDate.getTime())
-                ? `${item.parsedDate.getFullYear()}년 ${item.parsedDate.getMonth() + 1}월 ${item.parsedDate.getDate()}일`
+        const grouped = dataList.reduce((acc, curr) => {
+            const dateStr = !isNaN(curr.parsedDate.getTime())
+                ? `${curr.parsedDate.getFullYear()}년 ${curr.parsedDate.getMonth() + 1}월 ${curr.parsedDate.getDate()}일`
                 : "날짜 정보 없음";
-
             if (!acc[dateStr]) acc[dateStr] = [];
-            acc[dateStr].push(item);
+            acc[dateStr].push(curr);
             return acc;
         }, {});
 
-        // 그룹화된 데이터를 기반으로 HTML 생성
-        for (const [dateString, items] of Object.entries(groupedData)) {
+        for (const [date, items] of Object.entries(grouped)) {
             const groupDiv = document.createElement('div');
             groupDiv.className = 'timeline-group';
 
-            // 날짜 헤더 생성
-            const dateHeader = document.createElement('div');
-            dateHeader.className = 'timeline-date';
-            dateHeader.textContent = dateString;
-            groupDiv.appendChild(dateHeader);
-
-            // 해당 날짜의 카드 그리드 생성
-            const gridDiv = document.createElement('div');
-            gridDiv.className = 'summary-grid';
-
-            items.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'summary-card';
-
-                // 시간만 포맷팅 (예: "14:30")
+            let cardsHtml = items.map(item => {
                 const timeStr = !isNaN(item.parsedDate.getTime())
                     ? `${String(item.parsedDate.getHours()).padStart(2, '0')}:${String(item.parsedDate.getMinutes()).padStart(2, '0')}`
                     : "";
 
-                card.innerHTML = `
-                    <div class="card-header">
-                        <span class="topic-badge">📌 ${escapeHtml(item.topic || '자유 주제')}</span>
-                        <span class="time-text">🕒 ${timeStr}</span>
+                return `
+                    <div class="summary-card">
+                        <div class="card-header">
+                            <span class="topic-badge">${escapeHtml(item.topic || '자유 주제')}</span>
+                            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">🕒 ${timeStr}</span>
+                        </div>
+                        <div class="card-body">${formatSummaryText(item.summary)}</div>
+                        <div class="card-footer">
+                            <select class="category-select" onchange="updateCategory(${item.id}, this.value)">
+                                <option value="">카테고리 미지정</option>
+                                ${categories.map(c => `<option value="${c.id}" ${item.categoryId == c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                            </select>
+                        </div>
                     </div>
-                    <div class="card-body">${formatSummaryText(item.summary)}</div>
-                `;
-                gridDiv.appendChild(card);
-            });
+                    `;
+            }).join('');
 
-            groupDiv.appendChild(gridDiv);
+            groupDiv.innerHTML = `
+                    <div class="timeline-date">${date}</div>
+                    <div class="summary-grid">${cardsHtml}</div>
+                `;
             container.appendChild(groupDiv);
         }
     }
 
-    // 유틸리티 함수
+    function renderCalendar(dataList) {
+        const grid = document.getElementById('calendarGrid');
+        const label = document.getElementById('currentMonthLabel');
+        if (!grid || !label) return;
+
+        while (grid.childNodes.length > 7) { grid.removeChild(grid.lastChild); }
+
+        const year = currentCalDate.getFullYear();
+        const month = currentCalDate.getMonth();
+        label.textContent = `${year}년 ${month + 1}월`;
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 0; i < firstDay; i++) {
+            let cell = document.createElement('div');
+            cell.className = 'cal-cell';
+            cell.style.visibility = 'hidden';
+            grid.appendChild(cell);
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            let cell = document.createElement('div');
+            cell.className = 'cal-cell';
+            cell.innerHTML = `<div class="cal-date">${day}</div>`;
+
+            const dayItems = (dataList || []).filter(d => d.parsedDate.getFullYear() === year && d.parsedDate.getMonth() === month && d.parsedDate.getDate() === day);
+
+            dayItems.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'cal-item';
+                div.textContent = item.topic;
+                div.title = item.topic;
+                cell.appendChild(div);
+            });
+
+            grid.appendChild(cell);
+        }
+    }
+
+    function changeMonth(offset) {
+        currentCalDate.setMonth(currentCalDate.getMonth() + offset);
+        applyFrontendFilters();
+    }
+
+    function toggleView(view) {
+        document.getElementById('btnTimeline').classList.remove('active');
+        document.getElementById('btnCalendar').classList.remove('active');
+        document.getElementById('timelineView').style.display = 'none';
+        document.getElementById('calendarView').style.display = 'none';
+
+        if (view === 'timeline') {
+            document.getElementById('btnTimeline').classList.add('active');
+            document.getElementById('timelineView').style.display = 'block';
+        } else {
+            document.getElementById('btnCalendar').classList.add('active');
+            document.getElementById('calendarView').style.display = 'block';
+        }
+    }
+
+    function resetDateFilter() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        document.getElementById('searchInput').value = '';
+        applyFrontendFilters();
+    }
+
     function escapeHtml(unsafe) {
-        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        if (!unsafe) return "";
+        return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     function formatSummaryText(text) {
         if (!text) return "요약 내용이 없습니다.";
-        return escapeHtml(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        return escapeHtml(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     }
 </script>
 </body>
