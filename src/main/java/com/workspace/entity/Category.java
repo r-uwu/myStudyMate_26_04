@@ -23,8 +23,8 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String sessionId;
+    @Column(nullable = false, name = "user_email")
+    private String userEmail;
 
     @Column(nullable = false)
     private String name;

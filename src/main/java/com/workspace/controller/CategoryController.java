@@ -4,8 +4,10 @@ import com.workspace.entity.Category;
 import com.workspace.entity.Explanation;
 import com.workspace.repository.CategoryRepository;
 import com.workspace.repository.ExplanationRepository;
+import com.workspace.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,15 +21,21 @@ public class CategoryController {
     private final ExplanationRepository explanationRepository;
 
     @GetMapping("/categories")
-    public ResponseEntity<List<Category>> getCategories(@RequestParam String sessionId) {
-        return ResponseEntity.ok(categoryRepository.findBySessionId(sessionId));
+    public ResponseEntity<List<Category>> getCategories(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        String email = userDetails.getUsername(); // JWT 토큰에서 가로챈 인증 이메일 추출
+        return ResponseEntity.ok(categoryRepository.findByUserEmail(email));
     }
 
     @PostMapping("/categories")
-    public ResponseEntity<Category> createCategory(@RequestParam String sessionId, @RequestBody String name) {
-        // Remove quotes if the string is passed as a raw JSON string
+    public ResponseEntity<Category> createCategory(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody String name) {
+
+        String email = userDetails.getUsername();
         Category category = Category.builder()
-                .sessionId(sessionId)
+                .userEmail(email)
                 .name(name.replace("\"", "").trim())
                 .build();
         return ResponseEntity.ok(categoryRepository.save(category));

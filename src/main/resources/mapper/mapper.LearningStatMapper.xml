@@ -9,9 +9,9 @@
             topic AS subjectName,
             COUNT(id) AS studyCount
         FROM
-            study_record
+            explanation
         WHERE
-            session_id = #{sessionId}
+            user_email = #{userEmail}
         GROUP BY
             topic
         ORDER BY
@@ -24,9 +24,9 @@
             CONCAT(WEEK(created_at, 1) - WEEK(DATE_SUB(created_at, INTERVAL DAYOFMONTH(created_at) - 1 DAY), 1) + 1, '주차') AS weekLabel,
             COUNT(id) AS summaryCount
         FROM
-            study_record
+            explanation
         WHERE
-            session_id = #{sessionId}
+            user_email = #{userEmail}
           AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
         GROUP BY
             weekLabel
