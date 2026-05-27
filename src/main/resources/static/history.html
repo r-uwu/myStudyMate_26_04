@@ -462,6 +462,39 @@
         setDefaultDates();
         loadLearningLogs(0);
     });
+
+    // 유저 메뉴 드롭다운 토글
+    function toggleUserMenu(event) {
+        if(event) event.stopPropagation();
+        document.getElementById('userDropdown').classList.toggle('show');
+    }
+
+    // 바탕 클릭 시 드롭다운 닫기
+    window.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('userDropdown');
+        const userInfo = document.querySelector('.user-info');
+        if (dropdown && dropdown.classList.contains('show')) {
+            if (!userInfo.contains(event.target)) {
+                dropdown.classList.remove('show');
+            }
+        }
+    });
+
+    // 로그아웃 처리
+    function handleLogout() {
+        if (confirm('정말 로그아웃 하시겠습니까?')) {
+            localStorage.removeItem('jwt_token');
+            window.location.href = '/login.html';
+        }
+    }
+
+    // 글로벌 헤더
+    async function loadHeader() {
+        const res = await fetch('/header.html');
+        const html = await res.text();
+        document.body.insertAdjacentHTML('afterbegin', html);
+        document.getElementById('nav-' + currentPageId).classList.add('active');
+    }
 </script>
 </body>
 </html>

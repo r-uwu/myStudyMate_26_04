@@ -3,210 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mystudymate 통계 대시보드</title>
-    <!-- Chart.js CDN -->
+    <title>통계 대시보드 | 나의 스터디 메이트</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        if (!localStorage.getItem('jwt_token')) window.location.href = '/login.html';
+    </script>
     <style>
+        /* Global Design Variables */
         :root {
-            --primary-color: rgb(110, 142, 181);
-            --primary-light: rgba(110, 142, 181, 0.2);
-            --secondary-color: rgb(161, 179, 198);
-            --accent-color: rgb(94, 234, 212);
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
             --text-main: #0f172a;
             --text-muted: #64748b;
-            --border-color: #e2e8f0;
+            --border: #e2e8f0;
+            --primary: #3b82f6;
+            --primary-light: #eff6ff;
             --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #0f172a;
-                --card-bg: #1e293b;
-                --text-main: #f8fafc;
-                --text-muted: #94a3b8;
-                --border-color: #334155;
-                --primary-light: rgba(125, 160, 205, 0.2);
-                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-            }
-        }
+        * { box-sizing: border-box; }
 
         body {
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-            background-color: var(--bg-color);
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-main);
             color: var(--text-main);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            line-height: 1.6;
+            margin: 0; padding: 0;
+            display: flex; flex-direction: column; min-height: 100dvh;
         }
 
         .dashboard-container {
-            width: 100%;
-            max-width: 1200px;
-            padding: 3rem 1.5rem;
-            box-sizing: border-box;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 1.5rem;
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 1.75rem;
-            font-weight: 700;
-        }
-
-        .nav-links a {
-            padding: 0.6rem 1.25rem;
-            background-color: var(--card-bg);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            margin-left: 0.5rem;
-        }
-
-        .nav-links a:hover {
-            background-color: var(--bg-color);
-            border-color: var(--text-muted);
-        }
-
-        .nav-links a.active {
-            background-color: var(--primary-color);
-            color: #ffffff;
-            border-color: var(--primary-color);
+            width: 100%; max-width: 1200px;
+            margin: 0 auto; padding: 32px 24px;
+            flex: 1;
         }
 
         /* Dashboard Grid Layout */
         .chart-grid {
             display: grid;
             grid-template-columns: repeat(12, 1fr);
-            gap: 1.5rem;
+            gap: 24px;
         }
 
         .chart-card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
+            background-color: var(--bg-card);
+            border-radius: 16px; padding: 24px;
+            box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+            display: flex; flex-direction: column;
         }
 
         .chart-card h3 {
-            margin: 0 0 1rem 0;
-            font-size: 1.1rem;
-            color: var(--text-main);
-            font-weight: 600;
+            margin: 0 0 16px 0; font-size: 1.1rem;
+            color: var(--text-main); font-weight: 700;
         }
 
         .chart-container {
-            position: relative;
-            flex-grow: 1;
-            min-height: 250px;
-            width: 100%;
+            position: relative; flex-grow: 1; min-height: 280px; width: 100%;
         }
 
-        /* Span configurations for different charts */
         .col-span-8 { grid-column: span 8; }
         .col-span-4 { grid-column: span 4; }
-        .col-span-6 { grid-column: span 6; }
         .col-span-12 { grid-column: span 12; }
 
         @media (max-width: 992px) {
-            .col-span-8, .col-span-4, .col-span-6 {
-                grid-column: span 12;
-            }
+            .col-span-8, .col-span-4 { grid-column: span 12; }
         }
 
         /* Summary Stats Cards */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
+            gap: 24px; margin-bottom: 24px;
         }
 
         .stat-card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 1.5rem;
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--primary-color);
-            box-shadow: var(--shadow-sm);
+            background-color: var(--bg-card); border-radius: 16px; padding: 24px;
+            border: 1px solid var(--border); border-left: 4px solid var(--primary);
+            box-shadow: var(--shadow-sm); transition: transform 0.2s;
         }
 
-        .stat-title {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .stat-title { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+        .stat-value { font-size: 2rem; font-weight: 800; color: var(--text-main); }
 
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .home-btn {
-            background-color: var(--accent-color, #f6de90) !important;
-            color: #856341 !important;
-            border-color: #f6de90 !important;
-            font-weight: 700 !important;
-        }
-        .home-btn:hover {
-            filter: brightness(0.95);
-        }
     </style>
 </head>
 <body>
 
-<div class="dashboard-container">
-    <header>
-        <h1>학습 통계 대시보드</h1>
-        <div class="nav-links">
-            <a href="/index.html" class="home-btn">💬 대화하기</a>
-            <a href="/summary.html">학습 요약표</a>
-            <a href="/dashboard.html" class="active">통계 대시보드</a>
-        </div>
-    </header>
+<script src="/js/header.js"></script>
 
-    <!-- KPI Summary Section -->
+<div class="dashboard-container">
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-title">총 학습 시간 (이번 주)</div>
-            <div class="stat-value" id="totalHours">14.5h</div>
+            <div class="stat-value" id="totalHours">측정 불가</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">완료한 세션</div>
-            <div class="stat-value" id="completedSessions">24건</div>
+            <div class="stat-value" id="completedSessions">0건</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">연속 학습일</div>
-            <div class="stat-value" id="streakDays">5일</div>
+            <div class="stat-value" id="streakDays">- 일</div>
         </div>
     </div>
 
-    <!-- Charts Section -->
     <div class="chart-grid">
-        <!-- Weekly Study Trend (Area Chart) -->
         <div class="chart-card col-span-8">
             <h3>주간 학습 시간 추이</h3>
             <div class="chart-container">
@@ -214,7 +116,6 @@
             </div>
         </div>
 
-        <!-- Subject Distribution (Doughnut Chart) -->
         <div class="chart-card col-span-4">
             <h3>주제별 학습 비중</h3>
             <div class="chart-container">
@@ -222,10 +123,9 @@
             </div>
         </div>
 
-        <!-- Monthly Activity (Bar Chart) -->
         <div class="chart-card col-span-12">
             <h3>월간 학습 활동량</h3>
-            <div class="chart-container" style="min-height: 300px;">
+            <div class="chart-container" style="min-height: 320px;">
                 <canvas id="activityChart"></canvas>
             </div>
         </div>
@@ -234,12 +134,10 @@
 
 <script>
     const token = localStorage.getItem('jwt_token');
-    if (!token) {
-        window.location.href = '/login.html';
-    }
 
     const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
-    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim();
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
 
     Chart.defaults.color = textColor;
     Chart.defaults.font.family = "'Pretendard', sans-serif";
@@ -249,32 +147,22 @@
     let activityChartInstance = null;
 
     document.addEventListener('DOMContentLoaded', () => {
-        let sessionId = localStorage.getItem('msm_session_id');
-        if (!sessionId) {
-            console.warn("Session ID not found. Using default.");
-            sessionId = 'session_default';
-        }
-        loadDashboardData(sessionId);
+        /* Fix: Execute load without undefined sessionId parameter */
+        loadDashboardData();
     });
 
-    async function loadDashboardData(sessionId) {
+    async function loadDashboardData() {
         try {
             const [subjectRes, weeklyRes] = await Promise.all([
-                fetch(`/api/v1/learning/stats/subjects?sessionId=${sessionId}`,{
+                fetch(`/api/v1/learning/stats/subjects`, {
                     method: 'GET',
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
                 }),
-                fetch(`/api/v1/learning/stats/weekly?sessionId=${sessionId}`,{
-                method: 'GET',
-                    headers: {
-                    'Authorization': 'Bearer ' + token,
-                        'Content-Type': 'application/json'
-                }
-            })
-        ]);
+                fetch(`/api/v1/learning/stats/weekly`, {
+                    method: 'GET',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+                })
+            ]);
 
             if (subjectRes.ok && weeklyRes.ok) {
                 const subjectData = await subjectRes.json();
@@ -283,8 +171,6 @@
                 renderKPIs(weeklyData);
                 renderSubjectChart(subjectData);
                 renderActivityChart(weeklyData);
-
-                // 일별 통계 API가 구현되기 전까지 빈 차트 렌더링
                 renderTrendChartPlaceholder();
             } else {
                 console.error("API response error");
@@ -296,20 +182,13 @@
 
     function renderKPIs(weeklyData) {
         let totalSessions = 0;
-
-        // WeeklyStatResponse DTO의 summaryCount 필드 합산
         weeklyData.forEach(week => {
             totalSessions += (week.summaryCount || 0);
         });
-
-        // studyHours 데이터가 없으므로 임시 숨김 혹은 대체 텍스트 처리
-        document.getElementById('totalHours').textContent = '측정 불가';
         document.getElementById('completedSessions').textContent = totalSessions + '건';
-        document.getElementById('streakDays').textContent = '- 일';
     }
 
     function renderSubjectChart(subjectData) {
-        // SubjectStatResponse DTO 필드 매핑
         const labels = subjectData.map(d => d.subjectName || '기타');
         const dataPoints = subjectData.map(d => d.studyCount || 0);
 
@@ -323,23 +202,19 @@
                 datasets: [{
                     data: dataPoints,
                     backgroundColor: [
-                        'rgb(110, 142, 181)', 'rgb(161, 179, 198)',
-                        'rgb(94, 234, 212)', 'rgb(203, 213, 225)', 'rgb(148, 163, 184)'
+                        '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#e0e7ff'
                     ],
                     borderWidth: 0
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '70%',
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
                 plugins: { legend: { position: 'bottom', labels: { padding: 20 } } }
             }
         });
     }
 
     function renderActivityChart(weeklyData) {
-        // WeeklyStatResponse DTO 필드 매핑
         const labels = weeklyData.map(d => d.weekLabel || '미상');
         const dataPoints = weeklyData.map(d => d.summaryCount || 0);
 
@@ -353,19 +228,14 @@
                 datasets: [{
                     label: '생성된 요약본 수',
                     data: dataPoints,
-                    backgroundColor: 'rgb(110, 142, 181)',
-                    borderRadius: 4
+                    backgroundColor: primaryColor,
+                    borderRadius: 6
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: gridColor },
-                        ticks: { stepSize: 1 }
-                    },
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { stepSize: 1 } },
                     x: { grid: { display: false } }
                 }
             }
@@ -383,16 +253,13 @@
                 datasets: [{
                     label: '학습 시간 (시간)',
                     data: [0, 0, 0, 0, 0, 0, 0],
-                    borderColor: 'rgb(203, 213, 225)',
-                    backgroundColor: 'rgba(203, 213, 225, 0.2)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4
+                    borderColor: '#94a3b8',
+                    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                    borderWidth: 2, fill: true, tension: 0.4
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 scales: {
                     y: { beginAtZero: true, grid: { color: gridColor }, max: 5 },
                     x: { grid: { display: false } }

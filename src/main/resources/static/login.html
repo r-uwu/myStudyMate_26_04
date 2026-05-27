@@ -159,6 +159,14 @@
             alert('서버 오류가 발생했습니다.');
         }
     }
+
+    // 글로벌 헤더
+    async function loadHeader() {
+        const res = await fetch('/header.html');
+        const html = await res.text();
+        document.body.insertAdjacentHTML('afterbegin', html);
+        document.getElementById('nav-' + currentPageId).classList.add('active');
+    }
 </script>
 </body>
 </html>

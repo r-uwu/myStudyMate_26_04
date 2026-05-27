@@ -28,40 +28,40 @@ public class ChatBufferService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    public void bufferMessage(String sessionId, String message) {
-        String redisKey = REDIS_BUFFER_KEY_PREFIX + sessionId;
+    public void bufferMessage(String userEmail, String message) {
+        String redisKey = REDIS_BUFFER_KEY_PREFIX + userEmail; // sessionId -> userEmail
 
         // 1. Redis List에 메시지 누적 (RPUSH)
         redisTemplate.opsForList().rightPush(redisKey, message);
 
         // 2. 기존 예약된 타이머가 있다면 취소 (Debouncing)
-        ScheduledFuture<?> existingTask = debounceTasks.get(sessionId);
+        ScheduledFuture<?> existingTask = debounceTasks.get(userEmail);
         if (existingTask != null) {
             existingTask.cancel(false);
         }
 
         // 3. 새로운 타이머 예약 (3초 후 실행)
-        ScheduledFuture<?> newTask = scheduler.schedule(() -> processBufferedMessages(sessionId, redisKey),
+        ScheduledFuture<?> newTask = scheduler.schedule(() -> processBufferedMessages(userEmail, redisKey),
                 DEBOUNCE_DELAY_MS,
                 TimeUnit.MILLISECONDS);
-        debounceTasks.put(sessionId, newTask);
+        debounceTasks.put(userEmail, newTask);
     }
 
-    private void processBufferedMessages(String sessionId, String redisKey) {
+    private void processBufferedMessages(String userEmail, String redisKey) {
         // 1. 버퍼링된 모든 메시지 조회
         List<String> messages = redisTemplate.opsForList().range(redisKey, 0, -1);
 
         if (messages != null && !messages.isEmpty()) {
             // 2. Redis에서 버퍼 비우기
             redisTemplate.delete(redisKey);
-            debounceTasks.remove(sessionId);
+            debounceTasks.remove(userEmail);
 
-            // 3. 메시지 병합 및 Gemini API 호출 로직 (가상 메서드)
+            // 3. 메시지 병합 및 Gemini API 호출 로직
             String combinedPrompt = String.join("\n", messages);
             String aiResponse = callGeminiApi(combinedPrompt);
 
-            // 4. 클라이언트로 최종 AI 응답 전송
-            messagingTemplate.convertAndSendToUser(sessionId, "/queue/reply", aiResponse);
+            // 4. 클라이언트로 최종 AI 응답 전송 (userEmail을 식별자로 사용)
+            messagingTemplate.convertAndSendToUser(userEmail, "/queue/reply", aiResponse);
         }
     }
 
