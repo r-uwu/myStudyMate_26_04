@@ -30,4 +30,11 @@ public class Explanation {
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    public void updateCategory(Long categoryId) {
+        this.categoryId = categoryId;
+    }
 }
