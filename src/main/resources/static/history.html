@@ -291,6 +291,11 @@
 </div>
 
 <script>
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const currentSessionId = localStorage.getItem('msm_session_id');
 
@@ -337,7 +342,12 @@
                 endDate: endDate ? `${endDate}T23:59:59` : ''
             });
 
-            const response = await fetch(`/api/v1/learning/history?${queryParams.toString()}`);
+            const response = await fetch(`/api/v1/learning/history?${queryParams.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            });
             if (!response.ok) throw new Error("Server response error");
 
             const result = await response.json();

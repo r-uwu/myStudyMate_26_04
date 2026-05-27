@@ -242,6 +242,11 @@
 </div>
 
 <script>
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+
     let sessionId = localStorage.getItem('msm_session_id');
     if (!sessionId) {
         sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
@@ -414,7 +419,13 @@
         const formData = new FormData();
         formData.append('audio', blob, 'voice.webm');
         try {
-            const response = await fetch(`/api/v1/learning/audio?sessionId=${sessionId}`, { method: 'POST', body: formData });
+            const response = await fetch(`/api/v1/learning/audio`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + localStorage.getItem('jwt_token')
+                },
+                body: formData
+            });
             if (response.ok) {
                 const text = await response.text();
                 if (text.trim() !== "") appendMessage("🎤 " + text, 'user-msg');
@@ -430,7 +441,9 @@
 
         fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
+            headers: { 'Content-Type': 'text/plain',
+                'Authorization': 'Bearer ' + localStorage.getItem('jwt_token')
+            },
             body: "(System Notice: Prompt user to continue expression.)"
         }).catch(() => {
             isWaitingForAi = false;
@@ -536,7 +549,9 @@
         updateUIState('analyzing');
         try {
             await fetch(`/api/v1/learning/chat?sessionId=${sessionId}`, {
-                method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text
+                method: 'POST', headers: { 'Content-Type': 'text/plain',
+                    'Authorization': 'Bearer ' + localStorage.getItem('jwt_token')
+                }, body: text
             });
         } catch (error) {
             isWaitingForAi = false;
@@ -555,7 +570,12 @@
         if (globalStream) globalStream.getTracks().forEach(t => t.stop());
 
         try {
-            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, { method: 'POST' });
+            const response = await fetch(`/api/v1/learning/summary?sessionId=${sessionId}&topic=${encodeURIComponent(topic)}`, { method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + localStorage.getItem('jwt_token') // 이 줄만 추가!
+                }
+            });
             if (response.ok) {
                 document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 주제 요약이 데이터베이스에 정상 반영되었습니다.`;
             }

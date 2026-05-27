@@ -233,6 +233,11 @@
 </div>
 
 <script>
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+
     const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
     const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim();
 
@@ -255,9 +260,21 @@
     async function loadDashboardData(sessionId) {
         try {
             const [subjectRes, weeklyRes] = await Promise.all([
-                fetch(`/api/v1/learning/stats/subjects?sessionId=${sessionId}`),
-                fetch(`/api/v1/learning/stats/weekly?sessionId=${sessionId}`)
-            ]);
+                fetch(`/api/v1/learning/stats/subjects?sessionId=${sessionId}`,{
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                }),
+                fetch(`/api/v1/learning/stats/weekly?sessionId=${sessionId}`,{
+                method: 'GET',
+                    headers: {
+                    'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                }
+            })
+        ]);
 
             if (subjectRes.ok && weeklyRes.ok) {
                 const subjectData = await subjectRes.json();
