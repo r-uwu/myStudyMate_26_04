@@ -34,10 +34,13 @@ public class SecurityConfig {
                         // 정적 리소스 및 뷰 파일 전체 개방
                         .requestMatchers("/", "/index.html", "/login.html", "/summary.html", "/dashboard.html").permitAll()
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                        // 내부 에러 라우팅 개방
+                        .requestMatchers("/error").permitAll()
                         // 인증 API 개방
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // 그 외 모든 학습 코어 API는 인증 필수
                         .requestMatchers("/api/v1/learning/**").authenticated()
+                        .requestMatchers("/api/v1/learning/stats/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
