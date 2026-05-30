@@ -36,11 +36,23 @@ public class User {
     @Column(nullable = false)
     private Integer exp = 0;
 
+    @Column(nullable = false)
+    private String nickname;
+
     public void addExp(int earnedExp) {
         this.exp += earnedExp;
 
         if (this.exp >= this.level * 100) {
             this.level++;
         }
+    }
+
+    public void updateProfile(String name, String nickname) {
+        this.name = name;
+        this.nickname = nickname;
+    }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
     }
 }
