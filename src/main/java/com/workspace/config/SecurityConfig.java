@@ -32,7 +32,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 정적 리소스 및 뷰 파일 전체 개방
-                        .requestMatchers("/", "/index.html", "/login.html", "/summary.html", "/dashboard.html","/settings.html").permitAll()
+                        .requestMatchers("/", "/index.html", "/login.html", "/summary.html", "/dashboard.html","/settings.html", "/intro.html").permitAll()
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico","/api/v1/users/").permitAll()
                         // 내부 에러 라우팅 개방
                         .requestMatchers("/error").permitAll()
