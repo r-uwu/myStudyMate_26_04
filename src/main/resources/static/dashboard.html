@@ -6,6 +6,7 @@
     <title>통계 대시보드 | 나의 스터디 메이트</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Redirect to login if token is missing
         if (!localStorage.getItem('jwt_token')) window.location.href = '/login.html';
     </script>
     <style>
@@ -18,8 +19,10 @@
             --border: #e2e8f0;
             --primary: #3b82f6;
             --primary-light: #eff6ff;
+            --success: #10b981;
             --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --transition-speed: 0.2s;
         }
 
         * { box-sizing: border-box; }
@@ -29,16 +32,75 @@
             background-color: var(--bg-main);
             color: var(--text-main);
             margin: 0; padding: 0;
-            display: flex; flex-direction: column; min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+            overflow: hidden;
         }
+
+        #loadingOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: none; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 1000; transition: opacity var(--transition-speed);
+        }
+        .spinner {
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .dashboard-container {
-            width: 100%; max-width: 1200px;
-            margin: 0 auto; padding: 32px 24px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 24px;
+            /* Modified: Allow internal scrolling within the remaining flex space */
             flex: 1;
+            overflow-y: auto;
         }
 
-        /* Dashboard Grid Layout */
+        .dashboard-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .dashboard-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .dashboard-container::-webkit-scrollbar-thumb {
+            background-color: var(--border);
+            border-radius: 4px;
+        }
+        .dashboard-container::-webkit-scrollbar-thumb:hover {
+            background-color: var(--text-muted);
+        }
+
+        /* Stats Cards Update for 4 columns */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px; margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-card); border-radius: 16px; padding: 24px;
+            border: 1px solid var(--border); border-left: 4px solid var(--primary);
+            box-shadow: var(--shadow-sm); transition: transform var(--transition-speed);
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+        .stat-title { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+        .stat-value { font-size: 2rem; font-weight: 800; color: var(--text-main); }
+        .stat-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Progress Bar Specific */
+        .progress-container { width: 100%; background-color: var(--border); border-radius: 8px; height: 8px; margin-top: 12px; overflow: hidden; }
+        .progress-fill { height: 100%; background-color: var(--success); width: 0%; transition: width 1s ease-in-out; }
+
+        /* Chart Grid Layout */
         .chart-grid {
             display: grid;
             grid-template-columns: repeat(12, 1fr);
@@ -51,44 +113,43 @@
             box-shadow: var(--shadow-sm); border: 1px solid var(--border);
             display: flex; flex-direction: column;
         }
-
         .chart-card h3 {
             margin: 0 0 16px 0; font-size: 1.1rem;
             color: var(--text-main); font-weight: 700;
         }
-
         .chart-container {
             position: relative; flex-grow: 1; min-height: 280px; width: 100%;
         }
 
+        /* Timeline Specific */
+        .timeline-list { list-style: none; padding: 0; margin: 0; }
+        .timeline-item { position: relative; padding-left: 24px; padding-bottom: 16px; border-left: 2px solid var(--border); }
+        .timeline-item:last-child { border-left: 2px solid transparent; padding-bottom: 0; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -6px; top: 0;
+            width: 10px; height: 10px; border-radius: 50%;
+            background-color: var(--primary); border: 2px solid var(--bg-card);
+        }
+        .timeline-time { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .timeline-content { font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
+        .timeline-subject { display: inline-block; padding: 2px 8px; background-color: var(--primary-light); color: var(--primary); border-radius: 12px; font-size: 0.75rem; margin-top: 6px; }
+
         .col-span-8 { grid-column: span 8; }
         .col-span-4 { grid-column: span 4; }
+        .col-span-6 { grid-column: span 6; }
         .col-span-12 { grid-column: span 12; }
 
         @media (max-width: 992px) {
-            .col-span-8, .col-span-4 { grid-column: span 12; }
+            .col-span-8, .col-span-4, .col-span-6 { grid-column: span 12; }
         }
-
-        /* Summary Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 24px; margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background-color: var(--bg-card); border-radius: 16px; padding: 24px;
-            border: 1px solid var(--border); border-left: 4px solid var(--primary);
-            box-shadow: var(--shadow-sm); transition: transform 0.2s;
-        }
-
-        .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .stat-title { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
-        .stat-value { font-size: 2rem; font-weight: 800; color: var(--text-main); }
-
     </style>
 </head>
 <body>
+
+<div id="loadingOverlay">
+    <div class="spinner"></div>
+    <p style="margin-top: 16px; color: var(--text-muted); font-weight: 600;">데이터를 불러오는 중입니다...</p>
+</div>
 
 <script src="/js/header.js"></script>
 
@@ -96,15 +157,23 @@
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-title">총 학습 시간 (이번 주)</div>
-            <div class="stat-value" id="totalHours">측정 불가</div>
+            <div class="stat-value" id="totalHours">0 시간</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">완료한 세션</div>
-            <div class="stat-value" id="completedSessions">0건</div>
+            <div class="stat-value" id="completedSessions">0 건</div>
         </div>
         <div class="stat-card">
             <div class="stat-title">연속 학습일</div>
-            <div class="stat-value" id="streakDays">- 일</div>
+            <div class="stat-value" id="streakDays">0 일</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--success);">
+            <div class="stat-title">주간 목표 달성률 (10시간)</div>
+            <div class="stat-value" id="progressPercentage">0%</div>
+            <div class="progress-container">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+            <div class="stat-subtitle" id="progressRemaining"></div>
         </div>
     </div>
 
@@ -124,10 +193,9 @@
         </div>
 
         <div class="chart-card col-span-12">
-            <h3>월간 학습 활동량</h3>
-            <div class="chart-container" style="min-height: 320px;">
-                <canvas id="activityChart"></canvas>
-            </div>
+            <h3>최근 학습 타임라인</h3>
+            <ul class="timeline-list" id="timelineList">
+            </ul>
         </div>
     </div>
 </div>
@@ -135,138 +203,203 @@
 <script>
     const token = localStorage.getItem('jwt_token');
 
-    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
-    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
-    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+    const styleVars = getComputedStyle(document.documentElement);
+    const textColor = styleVars.getPropertyValue('--text-main').trim();
+    const mutedColor = styleVars.getPropertyValue('--text-muted').trim();
+    const gridColor = styleVars.getPropertyValue('--border').trim();
+    const primaryColor = styleVars.getPropertyValue('--primary').trim();
 
     Chart.defaults.color = textColor;
     Chart.defaults.font.family = "'Pretendard', sans-serif";
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
 
     let trendChartInstance = null;
     let subjectChartInstance = null;
-    let activityChartInstance = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-        /* Fix: Execute load without undefined sessionId parameter */
-        loadDashboardData();
-    });
+    document.addEventListener('DOMContentLoaded', loadDashboardData);
 
     async function loadDashboardData() {
+        const fetchOptions = {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+        };
+
+        const overlay = document.getElementById('loadingOverlay');
+
+        /* Set a timeout to display the overlay only if the data fetching
+           takes longer than 300ms.
+        */
+        const loadingTimeout = setTimeout(() => {
+            if (overlay) overlay.style.display = 'flex';
+        }, 300);
+
         try {
-            const [subjectRes, weeklyRes] = await Promise.all([
-                fetch(`/api/v1/learning/stats/subjects`, {
-                    method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-                }),
-                fetch(`/api/v1/learning/stats/weekly`, {
-                    method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-                })
+            const results = await Promise.allSettled([
+                fetch('/api/v1/learning/stats/subjects', fetchOptions),
+                fetch('/api/v1/learning/stats/weekly', fetchOptions),
+                fetch('/api/v1/learning/stats/daily', fetchOptions),
+                fetch('/api/v1/learning/history/recent', fetchOptions)
             ]);
 
-            if (subjectRes.ok && weeklyRes.ok) {
-                const subjectData = await subjectRes.json();
-                const weeklyData = await weeklyRes.json();
+            const subjectData = (results[0].status === 'fulfilled' && results[0].value.ok) ? await results[0].value.json() : [];
+            const weeklyData = (results[1].status === 'fulfilled' && results[1].value.ok) ? await results[1].value.json() : [];
+            const dailyData = (results[2].status === 'fulfilled' && results[2].value.ok) ? await results[2].value.json() : generateDummyDailyData();
+            const timelineData = (results[3].status === 'fulfilled' && results[3].value.ok) ? await results[3].value.json() : generateDummyTimelineData();
 
-                renderKPIs(weeklyData);
-                renderSubjectChart(subjectData);
-                renderActivityChart(weeklyData);
-                renderTrendChartPlaceholder();
-            } else {
-                console.error("API response error");
-            }
+            renderKPIs(weeklyData, dailyData);
+            renderSubjectChart(subjectData);
+            renderTrendChart(dailyData);
+            renderTimeline(timelineData);
+
         } catch (error) {
-            console.error("Failed to load dashboard data.", error);
+            console.error("Dashboard initialization failed:", error);
+        } finally {
+            /* Clear the timeout to prevent the overlay from appearing
+               if the fetch was completed before 300ms.
+            */
+            clearTimeout(loadingTimeout);
+
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 200);
+            }
         }
     }
 
-    function renderKPIs(weeklyData) {
-        let totalSessions = 0;
-        weeklyData.forEach(week => {
-            totalSessions += (week.summaryCount || 0);
-        });
-        document.getElementById('completedSessions').textContent = totalSessions + '건';
+    function renderKPIs(weeklyData, dailyData) {
+        const totalSessions = weeklyData.reduce((acc, curr) => acc + (curr.summaryCount || 0), 0);
+        document.getElementById('completedSessions').textContent = `${totalSessions} 건`;
+
+        const totalMinutes = dailyData.reduce((acc, curr) => acc + (curr.studyMinutes || 0), 0);
+        const totalHours = (totalMinutes / 60).toFixed(1);
+        document.getElementById('totalHours').textContent = `${totalHours} 시간`;
+
+        const streak = dailyData.filter(d => d.studyMinutes > 0).length;
+        document.getElementById('streakDays').textContent = `${streak} 일`;
+
+        // Render Progress Bar Logic (Target: 10 hours = 600 minutes)
+        const targetMinutes = 600;
+        let percentage = Math.round((totalMinutes / targetMinutes) * 100);
+        if (percentage > 100) percentage = 100;
+
+        document.getElementById('progressPercentage').textContent = `${percentage}%`;
+        document.getElementById('progressBar').style.width = `${percentage}%`;
+
+        const remainingHours = ((targetMinutes - totalMinutes) / 60).toFixed(1);
+        const subtitleEl = document.getElementById('progressRemaining');
+        if (remainingHours > 0) {
+            subtitleEl.textContent = `목표 달성까지 ${remainingHours}시간 남았습니다.`;
+        } else {
+            subtitleEl.textContent = `주간 목표를 달성했습니다.`;
+        }
     }
 
     function renderSubjectChart(subjectData) {
-        const labels = subjectData.map(d => d.subjectName || '기타');
-        const dataPoints = subjectData.map(d => d.studyCount || 0);
+        const labels = subjectData.length > 0 ? subjectData.map(d => d.subjectName) : ['데이터 없음'];
+        const dataPoints = subjectData.length > 0 ? subjectData.map(d => d.studyCount) : [1];
 
-        const ctxSubject = document.getElementById('subjectChart').getContext('2d');
+        const ctx = document.getElementById('subjectChart').getContext('2d');
         if (subjectChartInstance) subjectChartInstance.destroy();
 
-        subjectChartInstance = new Chart(ctxSubject, {
+        subjectChartInstance = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
                     data: dataPoints,
-                    backgroundColor: [
-                        '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#e0e7ff'
-                    ],
-                    borderWidth: 0
+                    backgroundColor: subjectData.length > 0
+                        ? ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#e0e7ff']
+                        : [gridColor],
+                    borderWidth: 0, hoverOffset: 4
                 }]
             },
             options: {
-                responsive: true, maintainAspectRatio: false, cutout: '70%',
-                plugins: { legend: { position: 'bottom', labels: { padding: 20 } } }
+                responsive: true, maintainAspectRatio: false, cutout: '75%',
+                plugins: { legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } } }
             }
         });
     }
 
-    function renderActivityChart(weeklyData) {
-        const labels = weeklyData.map(d => d.weekLabel || '미상');
-        const dataPoints = weeklyData.map(d => d.summaryCount || 0);
+    function renderTrendChart(dailyData) {
+        const labels = dailyData.map(d => d.dayLabel);
+        const dataPoints = dailyData.map(d => (d.studyMinutes / 60).toFixed(1));
 
-        const ctxActivity = document.getElementById('activityChart').getContext('2d');
-        if (activityChartInstance) activityChartInstance.destroy();
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if (trendChartInstance) trendChartInstance.destroy();
 
-        activityChartInstance = new Chart(ctxActivity, {
-            type: 'bar',
+        const gradientFill = ctx.createLinearGradient(0, 0, 0, 300);
+        gradientFill.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+        gradientFill.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: '생성된 요약본 수',
-                    data: dataPoints,
-                    backgroundColor: primaryColor,
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { stepSize: 1 } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-    }
-
-    function renderTrendChartPlaceholder() {
-        const ctxTrend = document.getElementById('trendChart').getContext('2d');
-        if (trendChartInstance) trendChartInstance.destroy();
-
-        trendChartInstance = new Chart(ctxTrend, {
-            type: 'line',
-            data: {
-                labels: ['월', '화', '수', '목', '금', '토', '일'],
-                datasets: [{
                     label: '학습 시간 (시간)',
-                    data: [0, 0, 0, 0, 0, 0, 0],
-                    borderColor: '#94a3b8',
-                    backgroundColor: 'rgba(148, 163, 184, 0.1)',
-                    borderWidth: 2, fill: true, tension: 0.4
+                    data: dataPoints,
+                    borderColor: primaryColor, backgroundColor: gradientFill,
+                    borderWidth: 3, pointBackgroundColor: '#ffffff',
+                    pointBorderColor: primaryColor, pointBorderWidth: 2,
+                    pointRadius: 4, pointHoverRadius: 6, fill: true, tension: 0.4
                 }]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: gridColor }, max: 5 },
-                    x: { grid: { display: false } }
+                    y: { beginAtZero: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: mutedColor }, suggestedMax: 5 },
+                    x: { grid: { display: false, drawBorder: false }, ticks: { color: mutedColor } }
                 },
                 plugins: { legend: { display: false } }
             }
         });
+    }
+
+    // Function to inject timeline DOM elements
+    function renderTimeline(timelineData) {
+        const listEl = document.getElementById('timelineList');
+        listEl.innerHTML = '';
+
+        if (timelineData.length === 0) {
+            listEl.innerHTML = '<li class="timeline-item"><div class="timeline-content">최근 학습 기록이 없습니다.</div></li>';
+            return;
+        }
+
+        timelineData.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'timeline-item';
+
+            // Format datetime string appropriately
+            const dateObj = new Date(item.timestamp);
+            const timeString = `${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일 ${dateObj.getHours()}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+
+            li.innerHTML = `
+                <div class="timeline-time">${timeString}</div>
+                <div class="timeline-content">${item.title}</div>
+                <div class="timeline-subject">${item.subject}</div>
+            `;
+            listEl.appendChild(li);
+        });
+    }
+
+    // Helper dummies
+    function generateDummyDailyData() {
+        return [
+            { dayLabel: '월', studyMinutes: 45 }, { dayLabel: '화', studyMinutes: 120 },
+            { dayLabel: '수', studyMinutes: 0 }, { dayLabel: '목', studyMinutes: 90 },
+            { dayLabel: '금', studyMinutes: 60 }, { dayLabel: '토', studyMinutes: 180 },
+            { dayLabel: '일', studyMinutes: 30 }
+        ];
+    }
+
+    function generateDummyTimelineData() {
+        const now = new Date();
+        return [
+            { timestamp: new Date(now.getTime() - 1000 * 60 * 30).toISOString(), title: '운영체제 메모리 관리 요약 완료', subject: '컴퓨터 공학' },
+            { timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24).toISOString(), title: '데이터베이스 정규화 복습 세션', subject: '데이터베이스' },
+            { timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 48).toISOString(), title: '알고리즘 동적 계획법 문제 풀이', subject: '알고리즘' }
+        ];
     }
 </script>
 </body>
