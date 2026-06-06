@@ -45,6 +45,24 @@
         .end-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #fef2f2; color: #ef4444; font-weight: 700; cursor: pointer; transition: 0.2s; }
         .end-btn:hover { background: #fee2e2; }
 
+        .end-btn-2 {
+            position: absolute;
+            top: auto;
+            right: 20px;
+            width: 16%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: #fef2f2;
+            color: #ef4444;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .end-btn-2:hover { background: #fee2e2; }
+
         .settings-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
         .settings-modal { background: var(--bg-card); padding: 24px; border-radius: 12px; width: 90%; max-width: 320px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 20px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.1rem; }
@@ -65,7 +83,12 @@
     <div class="status-bar">
         <div class="char-avatar" id="character"><img id="charImg" src="/images/blob-idle.png"></div>
         <div class="loading-text" id="statusText">대화 준비 완료</div>
+
+        <button class="end-btn-2" id="endBtn">💾 대화 종료 및<br>학습 요약하기</button>
+
     </div>
+
+
 
     <div class="chat-box" id="chatBox">
         <div class="message ai-msg">안녕! 오늘 공부할 내용을 나한테도 들려줄래? 😆</div>
@@ -77,7 +100,6 @@
             <input type="text" id="userInput" placeholder="메시지 입력..." autocomplete="off">
             <button class="send-btn" id="sendBtn">전송</button>
         </div>
-        <button class="end-btn" id="endBtn">💾 대화 종료 및 학습 요약하기</button>
     </div>
 
     <div class="settings-overlay" id="settingsModal">

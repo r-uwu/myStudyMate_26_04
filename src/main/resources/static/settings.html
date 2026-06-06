@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사용자 설정 | 나의 스터디 메이트</title>
+    <script>
+        if (!localStorage.getItem('jwt_token')) window.location.href = '/login.html';
+    </script>
+    <style>
+        /* 글로벌 디자인 변수 (기존 파일들과 통일) */
+        :root {
+            --bg-main: #f8fafc; --bg-card: #ffffff;
+            --text-main: #0f172a; --text-muted: #64748b;
+            --border: #e2e8f0; --primary: #3b82f6; --primary-hover: #2563eb;
+            --primary-light: #eff6ff; --danger: #ef4444; --danger-hover: #dc2626;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Pretendard', sans-serif; background-color: var(--bg-main);
+            color: var(--text-main); margin: 0; display: flex; flex-direction: column;
+            min-height: 100dvh;
+        }
+
+        .app-layout {
+            flex: 1; display: flex; width: 100%; max-width: 1000px;
+            margin: 40px auto; gap: 32px; padding: 0 24px;
+        }
+
+        /* 좌측 네비게이션 */
+        .settings-nav {
+            width: 240px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+        }
+        .settings-title {
+            font-size: 1.5rem; font-weight: 800; margin-bottom: 16px; padding-left: 8px;
+        }
+        .nav-item {
+            padding: 12px 16px; border-radius: 8px; cursor: pointer;
+            font-weight: 600; font-size: 1rem; color: var(--text-muted); transition: all 0.2s;
+            display: flex; align-items: center; gap: 10px; border: none; background: transparent; text-align: left;
+        }
+        .nav-item:hover { background: var(--bg-card); color: var(--text-main); }
+        .nav-item.active { background: var(--primary-light); color: var(--primary); }
+
+        /* 우측 콘텐츠 영역 */
+        .settings-content {
+            flex: 1; background: var(--bg-card); border-radius: 16px; padding: 32px;
+            border: 1px solid var(--border); box-shadow: var(--shadow-sm); min-height: 500px;
+        }
+
+        .tab-pane { display: none; animation: fadeIn 0.3s ease; }
+        .tab-pane.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .section-header { margin-top: 0; margin-bottom: 24px; font-size: 1.25rem; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+
+        /* 폼 요소 스타일 */
+        .form-group { margin-bottom: 24px; }
+        .form-label { display: block; font-size: 0.9rem; font-weight: 600; color: var(--text-main); margin-bottom: 8px; }
+        .form-input {
+            width: 100%; max-width: 400px; padding: 10px 16px; border: 1px solid var(--border);
+            border-radius: 8px; font-size: 1rem; background: var(--bg-main); color: var(--text-main);
+            transition: border-color 0.2s; outline: none;
+        }
+        .form-input:focus { border-color: var(--primary); background: #ffffff; }
+        .form-input:disabled { background: #e2e8f0; color: var(--text-muted); cursor: not-allowed; }
+
+        .btn {
+            padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.95rem;
+            cursor: pointer; transition: 0.2s; border: none;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: var(--danger-hover); }
+
+        .danger-zone {
+            margin-top: 40px; padding: 20px; border: 1px solid #fecaca;
+            border-radius: 8px; background: #fef2f2;
+        }
+        .danger-zone h4 { margin: 0 0 8px 0; color: var(--danger); font-size: 1rem; }
+        .danger-zone p { margin: 0 0 16px 0; font-size: 0.85rem; color: #991b1b; }
+    </style>
+</head>
+<body>
+
+<script src="/js/header.js"></script>
+
+<div class="app-layout">
+    <aside class="settings-nav">
+        <div class="settings-title">설정</div>
+        <button class="nav-item active" onclick="switchTab('profile')">👤 프로필 정보</button>
+        <button class="nav-item" onclick="switchTab('learning')">🎯 학습 목표</button>
+        <button class="nav-item" onclick="switchTab('security')">🔒 계정 보안</button>
+    </aside>
+
+    <main class="settings-content">
+        <div id="profile" class="tab-pane active">
+            <h2 class="section-header">프로필 정보</h2>
+            <form id="profileForm" onsubmit="updateProfile(event)">
+                <div class="form-group">
+                    <label class="form-label">이메일 계정 (변경 불가)</label>
+                    <input type="email" id="userEmail" class="form-input" disabled value="로딩 중...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">이름</label>
+                    <input type="text" id="userName" class="form-input" required placeholder="이름을 입력하세요">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">닉네임</label>
+                    <input type="text" id="userNickname" class="form-input" required placeholder="">
+                </div>
+                <button type="submit" class="btn btn-primary">변경사항 저장</button>
+            </form>
+        </div>
+
+        <div id="learning" class="tab-pane">
+            <h2 class="section-header">학습 목표 설정</h2>
+            <form id="learningForm" onsubmit="updateLearningGoals(event)">
+                <div class="form-group">
+                    <label class="form-label">주간 목표 학습 시간 (시간)</label>
+                    <input type="number" id="targetHours" class="form-input" min="1" max="100" value="10">
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">대시보드의 달성률 계산에 사용됩니다.</p>
+                </div>
+                <button type="submit" class="btn btn-primary">목표 저장</button>
+            </form>
+        </div>
+
+        <div id="security" class="tab-pane">
+            <h2 class="section-header">계정 보안</h2>
+            <form id="passwordForm" onsubmit="updatePassword(event)">
+                <div class="form-group">
+                    <label class="form-label">현재 비밀번호</label>
+                    <input type="password" id="currentPassword" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">새 비밀번호</label>
+                    <input type="password" id="newPassword" class="form-input" required minlength="8">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">새 비밀번호 확인</label>
+                    <input type="password" id="newPasswordConfirm" class="form-input" required minlength="8">
+                </div>
+                <button type="submit" class="btn btn-primary">비밀번호 변경</button>
+            </form>
+
+            <div class="danger-zone">
+                <h4>계정 탈퇴</h4>
+                <p>계정을 삭제하면 모든 학습 기록과 요약 데이터가 영구적으로 삭제되며 복구할 수 없습니다.</p>
+                <button class="btn btn-danger" onclick="deleteAccount()">회원 탈퇴</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const token = localStorage.getItem('jwt_token');
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUserProfile();
+    });
+
+    // 탭 전환 로직
+    function switchTab(tabId) {
+        document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+        event.currentTarget.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    // 1. 회원 정보 불러오기 API 연동
+    async function loadUserProfile() {
+        try {
+            // TODO: 백엔드 API 경로 확인 및 수정 요망
+            const res = await fetch('/api/v1/users/me', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('userEmail').value = data.email || '이메일 정보 없음';
+                document.getElementById('userName').value = data.name || '';
+                document.getElementById('userNickname').value = data.nickname || '';
+            } else {
+                console.warn("회원 정보를 불러오지 못했습니다. (API 미구현 가능성)");
+                document.getElementById('userEmail').value = "test@email.com (샘플)";
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // 2. 프로필 수정 API 연동
+    async function updateProfile(e) {
+        e.preventDefault();
+        const name = document.getElementById('userName').value;
+        const nickname = document.getElementById('userNickname').value;
+
+        try {
+            const res = await fetch('/api/v1/users/me', {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, nickname })
+            });
+
+            if (res.ok) alert('프로필이 성공적으로 업데이트되었습니다.');
+            else alert('업데이트 실패: 서버 오류');
+        } catch (e) { alert('네트워크 오류가 발생했습니다.'); }
+    }
+
+    // 3. 비밀번호 변경 로직
+    async function updatePassword(e) {
+        e.preventDefault();
+        const current = document.getElementById('currentPassword').value;
+        const newPw = document.getElementById('newPassword').value;
+        const confirmPw = document.getElementById('newPasswordConfirm').value;
+
+        if (newPw !== confirmPw) {
+            alert('새 비밀번호가 일치하지 않습니다.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/v1/users/password', {
+                method: 'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+            });
+
+            if (res.ok) {
+                alert('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
+                localStorage.removeItem('jwt_token');
+                window.location.href = '/login.html';
+            } else {
+                alert('비밀번호 변경 실패. 현재 비밀번호를 확인하세요.');
+            }
+        } catch (e) { alert('네트워크 오류'); }
+    }
+
+    // 4. 회원 탈퇴 로직
+    async function deleteAccount() {
+        if (confirm('정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+            try {
+                const res = await fetch('/api/v1/users/me', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+
+                if (res.ok) {
+                    alert('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
+                    localStorage.removeItem('jwt_token');
+                    window.location.href = '/login.html';
+                } else {
+                    alert('계정 삭제에 실패했습니다.');
+                }
+            } catch (e) { alert('네트워크 오류'); }
+        }
+    }
+
+    // 학습 목표 저장 (프론트엔드 임시 처리용)
+    function updateLearningGoals(e) {
+        e.preventDefault();
+        alert('학습 목표가 저장되었습니다!');
+    }
+</script>
+</body>
+</html>

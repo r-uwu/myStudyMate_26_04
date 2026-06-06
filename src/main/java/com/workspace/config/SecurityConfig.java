@@ -32,12 +32,15 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 정적 리소스 및 뷰 파일 전체 개방
-                        .requestMatchers("/", "/index.html", "/login.html", "/summary.html", "/dashboard.html").permitAll()
-                        .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                        .requestMatchers("/", "/index.html", "/login.html", "/summary.html", "/dashboard.html","/settings.html", "/intro.html").permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico","/api/v1/users/").permitAll()
+                        // 내부 에러 라우팅 개방
+                        .requestMatchers("/error").permitAll()
                         // 인증 API 개방
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // 그 외 모든 학습 코어 API는 인증 필수
                         .requestMatchers("/api/v1/learning/**").authenticated()
+                        .requestMatchers("/api/v1/learning/stats/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
