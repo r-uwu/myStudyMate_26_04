@@ -145,6 +145,15 @@
                     <label class="form-label">새 비밀번호 확인</label>
                     <input type="password" id="newPasswordConfirm" class="form-input" required minlength="8">
                 </div>
+                <div class="form-group">
+                    <label class="form-label">TTS 모델 (음성 엔진)</label>
+                    <select id="ttsProvider" class="form-input">
+                        <option value="openai">OpenAI (기본 - Nova)</option>
+                        <option value="google">Google Cloud (표준)</option>
+                        <option value="elevenlabs">ElevenLabs (자연스러운 억양)</option>
+                    </select>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">학습 시 AI가 응답할 때 사용할 음성 엔진을 선택합니다.</p>
+                </div>
                 <button type="submit" class="btn btn-primary">비밀번호 변경</button>
             </form>
 
@@ -176,7 +185,6 @@
     // 1. 회원 정보 불러오기 API 연동
     async function loadUserProfile() {
         try {
-            // TODO: 백엔드 API 경로 확인 및 수정 요망
             const res = await fetch('/api/v1/users/me', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
@@ -186,6 +194,14 @@
                 document.getElementById('userEmail').value = data.email || '이메일 정보 없음';
                 document.getElementById('userName').value = data.name || '';
                 document.getElementById('userNickname').value = data.nickname || '';
+
+                // 서버에서 ttsProvider 값을 받아와 드롭다운 초기값으로 세팅
+                if (data.ttsProvider) {
+                    document.getElementById('ttsProvider').value = data.ttsProvider;
+                } else {
+                    // 기본값 처리
+                    document.getElementById('ttsProvider').value = 'openai';
+                }
             } else {
                 console.warn("회원 정보를 불러오지 못했습니다. (API 미구현 가능성)");
                 document.getElementById('userEmail').value = "test@email.com (샘플)";
@@ -198,12 +214,14 @@
         e.preventDefault();
         const name = document.getElementById('userName').value;
         const nickname = document.getElementById('userNickname').value;
+        const ttsProvider = document.getElementById('ttsProvider').value; // 드롭다운 값 추출
 
         try {
             const res = await fetch('/api/v1/users/me', {
                 method: 'PUT',
                 headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, nickname })
+                // 페이로드에 ttsProvider 추가
+                body: JSON.stringify({ name, nickname, ttsProvider })
             });
 
             if (res.ok) alert('프로필이 성공적으로 업데이트되었습니다.');

@@ -264,6 +264,7 @@
                 <span>음성 제어 설정</span>
                 <button style="border:none; background:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);" onclick="closeSettings()">✕</button>
             </div>
+
             <div class="control-group">
                 <div class="control-label"><span>말하기 속도</span><span id="rateVal">1.0x</span></div>
                 <input type="range" id="rateSlider" min="0.7" max="1.4" step="0.1" value="1.0">
@@ -271,6 +272,15 @@
             <div class="control-group">
                 <div class="control-label"><span>출력 볼륨</span><span id="volumeVal">0.8</span></div>
                 <input type="range" id="volumeSlider" min="0.2" max="1.0" step="0.1" value="0.8">
+            </div>
+
+            <div class="control-group" style="margin-top: 15px;">
+                <div class="control-label" style="margin-bottom: 8px;"><span>음성 엔진 선택</span></div>
+                <select id="ttsProviderSelect" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; color: var(--text-main);">
+                    <option value="openai">OpenAI (기본 - Nova)</option>
+                    <option value="google">Google Cloud</option>
+                    <option value="elevenlabs">ElevenLabs</option>
+                </select>
             </div>
         </div>
     </div>
@@ -285,7 +295,6 @@
         </div>
     </div>
 </main>
-
 <script>
     const token = localStorage.getItem('jwt_token');
     const chatBox = document.getElementById('chatBox');
@@ -298,6 +307,15 @@
     const volumeSlider = document.getElementById('volumeSlider');
     const micBtn = document.getElementById('micBtn');
 
+    // 신규 추가: TTS 모델 선택 드롭다운
+    const ttsProviderSelect = document.getElementById('ttsProviderSelect');
+
+    // 초기 설정값 로드 및 적용
+    const savedTtsProvider = localStorage.getItem('preferredTtsProvider') || 'openai';
+    if (ttsProviderSelect) {
+        ttsProviderSelect.value = savedTtsProvider;
+    }
+
     document.body.addEventListener('click', (e) => {
         if (e.target.id === 'globalSettingsBtn' || e.target.closest('#globalSettingsBtn')) {
             settingsModal.style.display = 'flex';
@@ -309,6 +327,28 @@
 
     rateSlider.oninput = e => document.getElementById('rateVal').innerText = e.target.value + 'x';
     volumeSlider.oninput = e => document.getElementById('volumeVal').innerText = e.target.value;
+
+    // 신규 추가: TTS 옵션 변경 이벤트 리스너
+    if (ttsProviderSelect) {
+        ttsProviderSelect.addEventListener('change', async (e) => {
+            const selectedProvider = e.target.value;
+            localStorage.setItem('preferredTtsProvider', selectedProvider);
+
+            try {
+                const res = await fetch('/api/v1/users/me', {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ttsProvider: selectedProvider })
+                });
+                if (!res.ok) console.warn("DB update failed for TTS settings.");
+            } catch (error) {
+                console.error("Network error during TTS settings sync:", error);
+            }
+        });
+    }
 
     function setUiState(state) {
         if(state === 'idle') { charImg.src = "/images/blob-idle.png"; statusText.innerText = "대기 중"; }
@@ -346,15 +386,19 @@
         setUiState('thinking');
         isWaitingForAi = true;
 
-        /* Re-establish SSE connection if it was closed during an interruption */
         if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
             connectSSE();
         }
 
         try {
+            const currentTtsProvider = localStorage.getItem('preferredTtsProvider') || 'openai';
             await fetch('/api/v1/learning/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
+                headers: {
+                    'Content-Type': 'text/plain',
+                    'Authorization': 'Bearer ' + token,
+                    'X-TTS-Provider': currentTtsProvider // HTTP 헤더로 TTS 설정 전달
+                },
                 body: text
             });
         } catch(e) {
@@ -437,6 +481,8 @@
         if (isPlaying || audioQueue.length === 0) return;
         isPlaying = true;
         currentAudio = new Audio(audioQueue.shift());
+
+        // 오디오 재생 시 현재 슬라이더 값 동적 할당
         currentAudio.playbackRate = parseFloat(rateSlider.value);
         currentAudio.volume = parseFloat(volumeSlider.value);
         currentAudio.play();
@@ -559,14 +605,18 @@
         setUiState('thinking');
         appendMsg("...", 'user-msg');
 
-        /* Re-establish SSE connection */
         if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
             connectSSE();
         }
 
+        const currentTtsProvider = localStorage.getItem('preferredTtsProvider') || 'openai';
         fetch(`/api/v1/learning/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
+            headers: {
+                'Content-Type': 'text/plain',
+                'Authorization': 'Bearer ' + token,
+                'X-TTS-Provider': currentTtsProvider // HTTP 헤더로 TTS 설정 전달
+            },
             body: "(System Notice: Prompt user to continue expression.)"
         }).catch(() => {
             isWaitingForAi = false;
