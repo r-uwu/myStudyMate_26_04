@@ -1,49 +1,39 @@
 package com.workspace.service;
 
-import lombok.RequiredArgsConstructor;
+import com.workspace.service.tts.TtsProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TtsService {
 
-    @Value("${openai.api.key}")
-    private String apiKey;
+    private final Map<String, TtsProvider> providerMap;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    // 스프링이 TtsProvider를 구현한 모든 빈을 List로 주입합니다.
+    public TtsService(List<TtsProvider> providers) {
+        this.providerMap = providers.stream()
+                .collect(Collectors.toMap(TtsProvider::getProviderName, provider -> provider));
+    }
 
+    // 기본 프로바이더를 사용하는 오버로딩 메서드
     public byte[] generateSpeech(String text) {
-        String url = "https://api.openai.com/v1/audio/speech";
+        return generateSpeech(text, "openai");
+    }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+    // 프로바이더를 명시적으로 선택하는 메서드
+    public byte[] generateSpeech(String text, String providerName) {
+        TtsProvider provider = providerMap.get(providerName);
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "tts-1");
-        requestBody.put("input", text);
-        requestBody.put("voice", "nova"); // 여성 목소리 (alloy, echo, fable, onyx, nova, shimmer 중 선택 가능)
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        try {
-            // 오디오 파일을 byte 배열로 직접 받아옴
-            ResponseEntity<byte[]> response = restTemplate.postForEntity(url, entity, byte[].class);
-            return response.getBody();
-        } catch (Exception e) {
-            log.error("TTS 변환 실패: {}", e.getMessage());
-            return null;
+        if (provider == null) {
+            log.warn("지원하지 않는 TTS 프로바이더입니다: {}. 기본값(openai)으로 대체합니다.", providerName);
+            provider = providerMap.get("openai");
         }
+
+        return provider.generateSpeech(text);
     }
 }

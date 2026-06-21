@@ -8,71 +8,231 @@
         if (!localStorage.getItem('jwt_token')) window.location.href = '/login.html';
     </script>
     <style>
+        /* Global Design Variables */
         :root {
-            --bg-main: #f8fafc; --bg-card: #ffffff;
-            --text-main: #0f172a; --text-muted: #64748b;
-            --border: #e2e8f0; --primary: #3b82f6; --primary-hover: #2563eb;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-light: #eff6ff;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --radius-md: 12px;
+            --radius-lg: 16px;
         }
 
-        /* Viewport overflow explicitly hidden */
-        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+        * { box-sizing: border-box; }
 
-        /* min-height: 0 forces flex item to respect parent bounds */
-        .chat-container { flex: 1; min-height: 0; max-width: 800px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg-card); border-left: 1px solid var(--border); border-right: 1px solid var(--border); position: relative; }
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+            overflow: hidden;
+        }
 
-        .status-bar { flex-shrink: 0; padding: 12px; text-align: center; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .char-avatar { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
-        .char-avatar img { width: 100%; height: 100%; object-fit: contain; }
-        .loading-text { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+        /* Main Chat Container Layout */
+        .chat-container {
+            flex: 1;
+            min-height: 0;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-main);
+            border-left: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            position: relative;
+        }
 
-        /* min-height: 0 ensures scrolling activates instead of expanding */
-        .chat-box { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
-        .message { max-width: 85%; padding: 12px 16px; border-radius: 12px; line-height: 1.5; font-size: 0.95rem; }
-        .ai-msg { align-self: flex-start; background: var(--bg-main); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-        .user-msg { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+        /* Status Bar (Header) */
+        .status-bar {
+            position: relative;
+            flex-shrink: 0;
+            padding: 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            z-index: 10;
+        }
 
-        /* flex-shrink: 0 prevents buttons from being pushed out of view */
-        .bottom-area { flex-shrink: 0; padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg-card); display: flex; flex-direction: column; gap: 12px; }
-        .input-wrapper { display: flex; gap: 10px; align-items: center; background: var(--bg-main); padding: 6px 6px 6px 16px; border-radius: 30px; border: 1px solid var(--border); }
-        .input-wrapper input { flex: 1; border: none; background: transparent; outline: none; font-size: 1rem; }
+        /* Character Avatar - Modified: Removed masking and backgrounds */
+        .char-avatar {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Modified: Added drop-shadow directly to the image */
+        .char-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+        }
+        .loading-text { font-size: 1rem; font-weight: 700; color: var(--text-main); }
 
-        .mic-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: transparent; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-        .mic-btn.recording { background: #ef4444; color: white; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-
-        .send-btn { background: var(--primary); color: white; border: none; padding: 0 16px; height: 36px; border-radius: 18px; font-weight: 600; cursor: pointer; }
-        .end-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #fef2f2; color: #ef4444; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .end-btn:hover { background: #fee2e2; }
-
+        /* End Button */
         .end-btn-2 {
             position: absolute;
-            top: auto;
-            right: 20px;
-            width: 16%;
-            padding: 12px;
+            top: 24px;
+            right: 24px;
+            padding: 10px 16px;
             border-radius: 8px;
-            border: none;
+            border: 1px solid #fca5a5;
             background: #fef2f2;
             color: #ef4444;
-            font-weight: 700;
+            font-weight: 600;
+            font-size: 0.85rem;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.2s;
             white-space: nowrap;
         }
+        .end-btn-2:hover { background: #fee2e2; border-color: #ef4444; }
 
-        .end-btn-2:hover { background: #fee2e2; }
+        @media (max-width: 480px) {
+            .end-btn-2 {
+                top: 16px;
+                right: 16px;
+                padding: 8px 12px;
+                font-size: 0.75rem;
+            }
+            .status-bar { padding: 16px; }
+        }
 
-        .settings-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
-        .settings-modal { background: var(--bg-card); padding: 24px; border-radius: 12px; width: 90%; max-width: 320px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 20px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.1rem; }
+        /* Chat Box & Custom Scrollbar */
+        .chat-box {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-box::-webkit-scrollbar { width: 8px; }
+        .chat-box::-webkit-scrollbar-track { background: transparent; }
+        .chat-box::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 4px; }
+        .chat-box::-webkit-scrollbar-thumb:hover { background-color: var(--text-muted); }
+
+        /* Chat Messages */
+        .message {
+            max-width: 85%;
+            padding: 14px 18px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .ai-msg {
+            align-self: flex-start;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            border-top-left-radius: 4px;
+        }
+        .user-msg {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+            border-radius: var(--radius-lg);
+            border-top-right-radius: 4px;
+        }
+
+        /* Bottom Input Area */
+        .bottom-area {
+            flex-shrink: 0;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: var(--bg-main);
+            padding: 8px 8px 8px 16px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        .input-wrapper input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+        .input-wrapper input::placeholder { color: var(--text-muted); }
+
+        /* Buttons */
+        .mic-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg-card);
+            cursor: pointer;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+        .mic-btn:hover { background: var(--bg-main); }
+        .mic-btn.recording {
+            background: #ef4444;
+            color: white;
+            border-color: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+
+        .send-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            height: 38px;
+            border-radius: 19px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .send-btn:hover { background: var(--primary-hover); }
+
+        /* Modals & Overlays */
+        .settings-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .settings-modal { background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); width: 90%; max-width: 320px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--border); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.1rem; color: var(--text-main); }
         .control-group { display: flex; flex-direction: column; gap: 8px; }
         .control-label { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
         .settings-modal input[type="range"] { width: 100%; accent-color: var(--primary); }
 
-        .summary-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.95); z-index: 200; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
-        .summary-box { background: var(--bg-card); padding: 24px; border-radius: 12px; width: 100%; border: 1px solid var(--border); margin: 20px 0; line-height: 1.6; font-size: 0.95rem; }
-        .btn-outline { padding: 12px 24px; border-radius: 8px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; }
+        .summary-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.95); z-index: 200; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; backdrop-filter: blur(4px); }
+        .summary-box { background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); width: 100%; max-width: 500px; border: 1px solid var(--border); margin: 24px 0; line-height: 1.6; font-size: 0.95rem; box-shadow: var(--shadow-sm); }
+        .btn-outline { padding: 12px 24px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg-main); }
     </style>
 </head>
 <body>
@@ -82,13 +242,9 @@
 <main class="chat-container">
     <div class="status-bar">
         <div class="char-avatar" id="character"><img id="charImg" src="/images/blob-idle.png"></div>
-        <div class="loading-text" id="statusText">대화 준비 완료</div>
-
-        <button class="end-btn-2" id="endBtn">💾 대화 종료 및<br>학습 요약하기</button>
-
+        <div class="loading-text" id="statusText">대기 중</div>
+        <button class="end-btn-2" id="endBtn">종료 및 요약하기</button>
     </div>
-
-
 
     <div class="chat-box" id="chatBox">
         <div class="message ai-msg">안녕! 오늘 공부할 내용을 나한테도 들려줄래? 😆</div>
@@ -97,7 +253,7 @@
     <div class="bottom-area">
         <div class="input-wrapper">
             <button class="mic-btn" id="micBtn">🎤</button>
-            <input type="text" id="userInput" placeholder="메시지 입력..." autocomplete="off">
+            <input type="text" id="userInput" placeholder="메시지를 입력하세요..." autocomplete="off">
             <button class="send-btn" id="sendBtn">전송</button>
         </div>
     </div>
@@ -121,10 +277,10 @@
 
     <div class="summary-overlay" id="summaryOverlay">
         <div style="font-size: 3rem; margin-bottom: 10px;">📊</div>
-        <h2 style="margin: 0;">학습 요약 완료</h2>
+        <h2 style="margin: 0; color: var(--text-main);">학습 요약 완료</h2>
         <div class="summary-box" id="summaryContent">요약을 생성하고 있습니다...</div>
         <div style="display: flex; gap: 12px;">
-            <button class="btn-outline" onclick="location.reload()">다시 하기</button>
+            <button class="btn-outline" onclick="location.reload()">새로운 대화 시작</button>
             <button class="btn-outline" style="background: var(--primary); color: white; border-color: var(--primary);" onclick="window.location.href='/summary.html'">요약표 보기</button>
         </div>
     </div>
@@ -147,6 +303,7 @@
             settingsModal.style.display = 'flex';
         }
     });
+
     function closeSettings() { settingsModal.style.display = 'none'; }
     settingsModal.onclick = closeSettings;
 
@@ -172,7 +329,8 @@
         let html = text.trim();
         html = html.replace(/^###\s+(.*)/gm, '<div style="font-weight:800; margin-bottom:4px;">$1</div>');
         html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\n/g, '<br>'); return html;
+        html = html.replace(/\n/g, '<br>');
+        return html;
     }
 
     document.getElementById('sendBtn').onclick = sendText;
@@ -181,11 +339,17 @@
     async function sendText() {
         const text = userInput.value.trim();
         if(!text) return;
+
         stopAiAudio();
         appendMsg(text, 'user-msg');
         userInput.value = '';
         setUiState('thinking');
         isWaitingForAi = true;
+
+        /* Re-establish SSE connection if it was closed during an interruption */
+        if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+            connectSSE();
+        }
 
         try {
             await fetch('/api/v1/learning/chat', {
@@ -193,7 +357,11 @@
                 headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
                 body: text
             });
-        } catch(e) { console.error(e); isWaitingForAi = false; setUiState('idle'); }
+        } catch(e) {
+            console.error(e);
+            isWaitingForAi = false;
+            setUiState('idle');
+        }
     }
 
     let eventSource = null;
@@ -205,11 +373,17 @@
         eventSource = new EventSource(`/api/v1/learning/subscribe?token=${token}`);
 
         eventSource.addEventListener('message', (e) => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') { hasSpokenInChunk = false; mediaRecorder.stop(); }
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                hasSpokenInChunk = false;
+                mediaRecorder.stop();
+            }
             isWaitingForAi = true;
             const data = JSON.parse(e.data);
             renderStreaming(data.text);
-            if (data.audio) { audioQueue.push("data:audio/mp3;base64," + data.audio); playNextInQueue(); }
+            if (data.audio) {
+                audioQueue.push("data:audio/mp3;base64," + data.audio);
+                playNextInQueue();
+            }
         });
 
         eventSource.onerror = () => {
@@ -240,9 +414,22 @@
     const SPEECH_THRESHOLD = 0.03, CHUNK_SILENCE_MS = 1400, MAX_SILENCE_MS = 8000;
 
     function stopAiAudio() {
-        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
-        audioQueue.length = 0; isPlaying = false; isWaitingForAi = false;
-        currentAiTurnContainer = null; currentAiTurnText = "";
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+        }
+        audioQueue.length = 0;
+        isPlaying = false;
+        isWaitingForAi = false;
+        currentAiTurnContainer = null;
+        currentAiTurnText = "";
+
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+
         setUiState('idle');
     }
 
@@ -258,21 +445,29 @@
             isPlaying = false;
             if (audioQueue.length > 0) playNextInQueue();
             else {
-                isWaitingForAi = false; currentAudio = null; currentAiTurnContainer = null; currentAiTurnText = "";
-                if (isAutoMode) startContinuousListening(); else setUiState('idle');
+                isWaitingForAi = false;
+                currentAudio = null;
+                currentAiTurnContainer = null;
+                currentAiTurnText = "";
+                if (isAutoMode) startContinuousListening();
+                else setUiState('idle');
             }
         };
     }
 
     micBtn.onclick = async () => {
         if (isAutoMode) {
-            isAutoMode = false; stopAiAudio();
+            isAutoMode = false;
+            stopAiAudio();
             if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-            micBtn.textContent = '🎤'; micBtn.classList.remove('recording');
+            micBtn.textContent = '🎤';
+            micBtn.classList.remove('recording');
         } else {
             isAutoMode = true;
-            stopAiAudio(); // Halt AI audio and arrays instantly upon activation
-            micBtn.textContent = '⏹️'; micBtn.classList.add('recording');
+            stopAiAudio();
+            micBtn.textContent = '⏹️';
+            micBtn.classList.add('recording');
+
             if (!globalStream) {
                 try {
                     globalStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -282,7 +477,12 @@
                     source.connect(analyser);
                     dataArray = new Float32Array(analyser.frequencyBinCount);
                     monitorVAD();
-                } catch (e) { alert("마이크 권한이 필요합니다."); isAutoMode = false; micBtn.classList.remove('recording'); return; }
+                } catch (e) {
+                    alert("마이크 권한이 필요합니다.");
+                    isAutoMode = false;
+                    micBtn.classList.remove('recording');
+                    return;
+                }
             }
             startContinuousListening();
         }
@@ -291,19 +491,25 @@
     function monitorVAD() {
         requestAnimationFrame(monitorVAD);
         if (!isAutoMode || !isRecording) return;
+
         analyser.getFloatTimeDomainData(dataArray);
-        let sum = 0; for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
         let rms = Math.sqrt(sum / dataArray.length);
 
         if (rms > SPEECH_THRESHOLD) {
             if (isPlaying || isWaitingForAi) stopAiAudio();
-            hasSpokenInChunk = true; silenceStart = null; totalSilenceStart = Date.now();
+            hasSpokenInChunk = true;
+            silenceStart = null;
+            totalSilenceStart = Date.now();
             setUiState('listening');
         } else {
             if (isPlaying || isWaitingForAi) return;
             if (hasSpokenInChunk) {
                 if (!silenceStart) silenceStart = Date.now();
-                else if (Date.now() - silenceStart > CHUNK_SILENCE_MS) { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); }
+                else if (Date.now() - silenceStart > CHUNK_SILENCE_MS) {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+                }
             } else {
                 if (!totalSilenceStart) totalSilenceStart = Date.now();
                 else if (Date.now() - totalSilenceStart > MAX_SILENCE_MS) triggerForceAiResponse();
@@ -313,32 +519,59 @@
 
     function startContinuousListening() {
         if (!isAutoMode || isPlaying || isWaitingForAi) return;
-        audioChunks = []; hasSpokenInChunk = false; silenceStart = null; totalSilenceStart = Date.now();
+        audioChunks = [];
+        hasSpokenInChunk = false;
+        silenceStart = null;
+        totalSilenceStart = Date.now();
+
         mediaRecorder = new MediaRecorder(globalStream);
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
         mediaRecorder.onstop = () => {
-            isRecording = false; const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            isRecording = false;
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
             if (hasSpokenInChunk && blob.size > 1000) sendChunkToServer(blob);
             if (isAutoMode && !isWaitingForAi && !isPlaying) startContinuousListening();
         };
-        mediaRecorder.start(); isRecording = true; setUiState('listening');
+        mediaRecorder.start();
+        isRecording = true;
+        setUiState('listening');
     }
 
     async function sendChunkToServer(blob) {
-        const formData = new FormData(); formData.append('audio', blob, 'voice.webm');
+        const formData = new FormData();
+        formData.append('audio', blob, 'voice.webm');
         try {
-            const res = await fetch(`/api/v1/learning/audio`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
-            if (res.ok) { const text = await res.text(); if (text.trim() !== "") appendMsg("🎤 " + text, 'user-msg'); }
+            const res = await fetch(`/api/v1/learning/audio`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: formData
+            });
+            if (res.ok) {
+                const text = await res.text();
+                if (text.trim() !== "") appendMsg("🎤 " + text, 'user-msg');
+            }
         } catch (e) {}
     }
 
     function triggerForceAiResponse() {
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-        isWaitingForAi = true; setUiState('thinking'); appendMsg("...", 'user-msg');
+        isWaitingForAi = true;
+        setUiState('thinking');
+        appendMsg("...", 'user-msg');
+
+        /* Re-establish SSE connection */
+        if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+            connectSSE();
+        }
+
         fetch(`/api/v1/learning/chat`, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain', 'Authorization': 'Bearer ' + token },
             body: "(System Notice: Prompt user to continue expression.)"
-        }).catch(() => { isWaitingForAi = false; if (isAutoMode) startContinuousListening(); });
+        }).catch(() => {
+            isWaitingForAi = false;
+            if (isAutoMode) startContinuousListening();
+        });
     }
 
     document.getElementById('endBtn').onclick = async () => {
@@ -346,7 +579,8 @@
         if(!topic) return;
 
         document.getElementById('summaryOverlay').style.display = 'flex';
-        isAutoMode = false; stopAiAudio();
+        isAutoMode = false;
+        stopAiAudio();
         if (globalStream) globalStream.getTracks().forEach(t => t.stop());
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
 
@@ -356,11 +590,13 @@
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             if(res.ok) {
-                document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 주제 요약이 데이터베이스에 정상 반영되었습니다.`;
+                document.getElementById('summaryContent').innerHTML = `<strong>"${topic}"</strong> 주제 요약이 정상적으로 반영되었습니다.`;
             } else {
                 document.getElementById('summaryContent').innerHTML = "서버 에러로 요약을 저장하지 못했습니다.";
             }
-        } catch(e) { document.getElementById('summaryContent').innerHTML = "네트워크 에러 발생"; }
+        } catch(e) {
+            document.getElementById('summaryContent').innerHTML = "네트워크 에러가 발생했습니다.";
+        }
     };
 </script>
 </body>
