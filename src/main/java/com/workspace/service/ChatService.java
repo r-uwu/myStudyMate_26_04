@@ -1,5 +1,6 @@
 package com.workspace.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workspace.entity.Explanation;
@@ -63,6 +64,9 @@ public class ChatService {
     private final ConcurrentHashMap<String, ScheduledFuture<?>> debounceTasks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, StringBuilder> messageBuffers = new ConcurrentHashMap<>();
     private static final long DEBOUNCE_DELAY_MS = 2000;
+
+    private final ApplicationEventPublisher eventPublisher;
+
 
     public SseEmitter subscribe(String userEmail) {
         SseEmitter emitter = new SseEmitter(300000L);
@@ -267,6 +271,8 @@ public class ChatService {
                 .build();
         explanationRepository.save(explanation);
         log.info("유저 {}의 요약 데이터가 DB에 저장되었습니다.", userEmail);
+
+        eventPublisher.publishEvent(new StudyCompletedEvent(userEmail, topic, /* 학습 시간 */));
     }
 
     private String getSyncChatResponse(String prompt) {
