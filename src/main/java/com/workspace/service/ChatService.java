@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.workspace.event.StudyCompletedEvent;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -262,6 +263,7 @@ public class ChatService {
         return explanationRepository.findByUserEmail(userEmail);
     }
 
+
     private void saveToDb(String userEmail, String topic, String summary) {
         Explanation explanation = Explanation.builder()
                 .userEmail(userEmail)
@@ -272,7 +274,8 @@ public class ChatService {
         explanationRepository.save(explanation);
         log.info("유저 {}의 요약 데이터가 DB에 저장되었습니다.", userEmail);
 
-        eventPublisher.publishEvent(new StudyCompletedEvent(userEmail, topic, /* 학습 시간 */));
+        // 0L을 할당하여 컴파일 에러 해결 및 이벤트 발행 처리
+        eventPublisher.publishEvent(new StudyCompletedEvent(userEmail, topic, 0L));
     }
 
     private String getSyncChatResponse(String prompt) {
